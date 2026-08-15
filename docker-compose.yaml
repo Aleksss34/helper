@@ -1,0 +1,48 @@
+services:
+  postgres:
+
+    image: postgres:16-alpine
+    container_name: ${DB_POSTGRES_CONTAINER}
+
+    ports:
+      - ${DB_POSTGRES_PORT}:5432
+    environment:
+      - POSTGRES_USER=${DB_POSTGRES_USER}
+      - POSTGRES_DB=${DB_POSTGRES_NAME}
+      - POSTGRES_PASSWORD=${DB_POSTGRES_PASSWORD}
+    volumes:
+      - ./init-scripts:/docker-entrypoint-initdb.d
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_db
+    ports:
+      - "6334:6334"
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: always
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: ollama_init
+    depends_on:
+      - ollama
+
+    entrypoint: >
+      sh -c "sleep 3 && 
+      curl -s http://ollama:11434/api/pull -d '{\"name\": \"bge-m3\"}' && 
+      curl -s http://ollama:11434/api/pull -d '{\"name\": \"qwen2.5:3b\"}'"
+
+
+volumes:
+  qdrant_data:
+  ollama_data:
