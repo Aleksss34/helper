@@ -20,3 +20,6 @@ qdrant:
   batch-size: 100
   limit-points: 4
   score-threshold: 0.5
+
+parser:
+  browser-path: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"

@@ -2,11 +2,12 @@ package app
 
 import (
 	"context"
-	restapp "gateway/backend/internal/app/rest"
-	"gateway/backend/internal/config"
-	"gateway/backend/internal/domain"
-	"gateway/backend/internal/service"
-	"gateway/backend/internal/storage"
+
+	restapp "github.com/Aleksss34/helper/backend/internal/app/rest"
+	"github.com/Aleksss34/helper/backend/internal/config"
+	"github.com/Aleksss34/helper/backend/internal/domain"
+	"github.com/Aleksss34/helper/backend/internal/service"
+	"github.com/Aleksss34/helper/backend/internal/storage"
 
 	"log/slog"
 	"net/http"
@@ -20,7 +21,7 @@ type App struct {
 	Server *restapp.App
 }
 
-func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, gatewayCfg config.GatewayConfig, qdrantCfg config.QdrantConfig, timeoutServer int64) *App {
+func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, gatewayCfg config.GatewayConfig, parserCfg config.ParserConfig, qdrantCfg config.QdrantConfig, timeoutServer int64) *App {
 	//db, err := postgres.Conn(params)
 	qdrantConf := &qdrant.Config{Port: qdrantCfg.Port, Host: qdrantCfg.Host}
 	clientQdrant, err := qdrant.NewClient(qdrantConf)
@@ -34,7 +35,7 @@ func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, ga
 	if err != nil {
 		panic("Не удалось полключиться к олламе, ошибка: " + err.Error())
 	}
-	parserService := service.NewParser(log, httpClient, ollamaClient, qdr, qdrantCfg.BatchSize)
+	parserService := service.NewParser(log, httpClient, ollamaClient, parserCfg.BrowserPath, qdr, qdrantCfg.BatchSize)
 	searcherService := service.NewSearcher(log, qdr, ollamaClient)
 	serv := service.NewService(parserService, searcherService)
 

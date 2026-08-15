@@ -3,7 +3,8 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"gateway/internal/domain"
+
+	"github.com/Aleksss34/helper/backend/internal/domain"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )

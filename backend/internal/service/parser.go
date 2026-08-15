@@ -3,17 +3,17 @@ package service
 import (
 	"context"
 	"fmt"
-	"gateway/backend/internal/dto"
 	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/Aleksss34/helper/backend/internal/dto"
 
 	"github.com/chromedp/chromedp"
 	"github.com/ollama/ollama/api"
 )
 
 const baseURL = "https://wiki.amazing-online.com"
-const browserPath = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
 
 type PageEntry struct {
 	Title string
@@ -24,7 +24,7 @@ func (p *Parser) Parse(ctx context.Context) error {
 	var op = "service.parser.Parse"
 	log := p.log.With(slog.String("op", op))
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.ExecPath(browserPath),
+		chromedp.ExecPath(p.browserPath),
 	)
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancelAlloc()

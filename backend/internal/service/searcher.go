@@ -50,7 +50,7 @@ func (s *Searcher) Search(ctx context.Context, question string, out chan<- strin
 Ответ:`,
 		question, possAnswer,
 	)
-	log.Info("Получившийся промт:", slog.String("Промт", prompt))
+	fmt.Println(prompt)
 	stream := true
 	reqOllama := &api.GenerateRequest{
 		Model:   "qwen2.5:3b",

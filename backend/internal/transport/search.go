@@ -3,9 +3,10 @@ package transport
 import (
 	"encoding/json"
 	"fmt"
-	"gateway/backend/internal/dto"
 	"log/slog"
 	"net/http"
+
+	"github.com/Aleksss34/helper/backend/internal/dto"
 )
 
 type Resp struct {

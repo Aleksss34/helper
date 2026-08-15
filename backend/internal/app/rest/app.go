@@ -3,11 +3,14 @@ package restapp
 import (
 	"context"
 	"fmt"
-	"gateway/backend/internal/service"
-	"gateway/backend/internal/transport"
+
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/Aleksss34/helper/backend/internal/transport"
+
+	"github.com/Aleksss34/helper/backend/internal/service"
 )
 
 type App struct {

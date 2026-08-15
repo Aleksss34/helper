@@ -1,4 +1,4 @@
-module gateway
+module github.com/Aleksss34/helper
 
 go 1.26.1
 

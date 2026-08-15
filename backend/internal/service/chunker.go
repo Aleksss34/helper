@@ -2,10 +2,11 @@ package service
 
 import (
 	"fmt"
-	"gateway/backend/internal/dto"
 	"log/slog"
 	"regexp"
 	"strings"
+
+	"github.com/Aleksss34/helper/backend/internal/dto"
 )
 
 // Порог для обычных статей без чёткой структуры разделов

@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"gateway/backend/internal/app"
-	"gateway/backend/internal/config"
-	"gateway/backend/internal/domain"
+
+	"github.com/Aleksss34/helper/backend/internal/app"
+	"github.com/Aleksss34/helper/backend/internal/config"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 
 	"log/slog"
 	"os"
@@ -32,7 +33,7 @@ func main() {
 		Password: cfg.Postgres.Password,
 		Sslmode:  cfg.Postgres.Sslmode,
 	}
-	application := app.New(ctx, log, params, cfg.Gateway, cfg.Qdrant, cfg.TimeoutServer)
+	application := app.New(ctx, log, params, cfg.Gateway, cfg.Parser, cfg.Qdrant, cfg.TimeoutServer)
 	go func() {
 		application.Server.MustRun()
 	}()

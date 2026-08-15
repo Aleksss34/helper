@@ -3,7 +3,8 @@ package storage
 import (
 	"context"
 	"fmt"
-	"gateway/backend/internal/dto"
+
+	"github.com/Aleksss34/helper/backend/internal/dto"
 
 	"github.com/qdrant/go-client/qdrant"
 )

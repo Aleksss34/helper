@@ -27,11 +27,16 @@ type QdrantConfig struct {
 	LimitPoints    uint64  `yaml:"limit-points"`
 	ScoreThreshold float32 `yaml:"score-threshold"`
 }
+
+type ParserConfig struct {
+	BrowserPath string `yaml:"browser-path"`
+}
 type Config struct {
 	Env           string         `yaml:"env"`
 	TimeoutServer int64          `yaml:"timeout-server"`
 	Gateway       GatewayConfig  `yaml:"gateway"`
 	Postgres      PostgresConfig `yaml:"postgres"`
+	Parser        ParserConfig   `yaml:"parser"`
 	Qdrant        QdrantConfig   `yaml:"qdrant"`
 }
 
