@@ -2,7 +2,7 @@
 build:
 	go build -o backend/bin/amazing-helper backend/cmd/main.go
 run: build
-
+	npm run dev
 	./backend/bin/amazing-helper --config=./backend/configs/local.yaml
 run-containers:
 	docker compose down -v

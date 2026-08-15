@@ -4,6 +4,6 @@
 .LSOverride
 ._*
 /bin/
-*.local.yaml
-.env
+#*.local.yaml
+#.env
 .idea/
