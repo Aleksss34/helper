@@ -6,13 +6,14 @@ import (
 	"net/http"
 
 	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/sashabaranov/go-openai"
 
 	"github.com/ollama/ollama/api"
 )
 
 type Qdrant interface {
 	Upsert(ctx context.Context, points []*dto.Point) error
-	Get(ctx context.Context, embedding []float32) ([]*dto.Point, error)
+	Get(ctx context.Context, embedding []float32, server string) ([]*dto.Point, error)
 }
 
 type Parser struct {
@@ -27,7 +28,9 @@ type Parser struct {
 type Searcher struct {
 	log          *slog.Logger
 	ollamaClient *api.Client
+
 	qdrant       Qdrant
+	openaiClient *openai.Client
 }
 type Service struct {
 	Parser   *Parser
@@ -38,9 +41,9 @@ func NewParser(log *slog.Logger, httpClient *http.Client, ollamaClient *api.Clie
 
 	return &Parser{log: log, httpClient: httpClient, ollamaClient: ollamaClient, browserPath: browserPath, qdrant: qdrant, batchSize: batchSize}
 }
-func NewSearcher(log *slog.Logger, qdrant Qdrant, ollamaClient *api.Client) *Searcher {
+func NewSearcher(log *slog.Logger, qdrant Qdrant, ollamaClient *api.Client, openaiClient *openai.Client) *Searcher {
 
-	return &Searcher{log: log, qdrant: qdrant, ollamaClient: ollamaClient}
+	return &Searcher{log: log, qdrant: qdrant, ollamaClient: ollamaClient, openaiClient: openaiClient}
 }
 
 func NewService(parser *Parser, searcher *Searcher) *Service {

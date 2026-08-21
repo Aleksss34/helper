@@ -33,7 +33,7 @@ func main() {
 		Password: cfg.Postgres.Password,
 		Sslmode:  cfg.Postgres.Sslmode,
 	}
-	application := app.New(ctx, log, params, cfg.Gateway, cfg.Parser, cfg.Qdrant, cfg.TimeoutServer)
+	application := app.New(ctx, log, params, cfg.Gateway, cfg.Parser, cfg.Qdrant, cfg.ApiKeyGroq, cfg.TimeoutServer)
 	go func() {
 		application.Server.MustRun()
 	}()

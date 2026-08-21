@@ -2,16 +2,16 @@ package app
 
 import (
 	"context"
+	"log/slog"
+	"net/http"
+	"time"
 
 	restapp "github.com/Aleksss34/helper/backend/internal/app/rest"
 	"github.com/Aleksss34/helper/backend/internal/config"
 	"github.com/Aleksss34/helper/backend/internal/domain"
 	"github.com/Aleksss34/helper/backend/internal/service"
 	"github.com/Aleksss34/helper/backend/internal/storage"
-
-	"log/slog"
-	"net/http"
-	"time"
+	"github.com/sashabaranov/go-openai"
 
 	"github.com/ollama/ollama/api"
 	"github.com/qdrant/go-client/qdrant"
@@ -21,7 +21,7 @@ type App struct {
 	Server *restapp.App
 }
 
-func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, gatewayCfg config.GatewayConfig, parserCfg config.ParserConfig, qdrantCfg config.QdrantConfig, timeoutServer int64) *App {
+func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, gatewayCfg config.GatewayConfig, parserCfg config.ParserConfig, qdrantCfg config.QdrantConfig, apiKey string, timeoutServer int64) *App {
 	//db, err := postgres.Conn(params)
 	qdrantConf := &qdrant.Config{Port: qdrantCfg.Port, Host: qdrantCfg.Host}
 	clientQdrant, err := qdrant.NewClient(qdrantConf)
@@ -35,8 +35,12 @@ func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, ga
 	if err != nil {
 		panic("Не удалось полключиться к олламе, ошибка: " + err.Error())
 	}
+	cfgOpenai := openai.DefaultConfig(apiKey)
+	cfgOpenai.BaseURL = "https://api.groq.com/openai/v1"
+	clientOpenAi := openai.NewClientWithConfig(cfgOpenai)
+
 	parserService := service.NewParser(log, httpClient, ollamaClient, parserCfg.BrowserPath, qdr, qdrantCfg.BatchSize)
-	searcherService := service.NewSearcher(log, qdr, ollamaClient)
+	searcherService := service.NewSearcher(log, qdr, ollamaClient, clientOpenAi)
 	serv := service.NewService(parserService, searcherService)
 
 	serverApp := restapp.New(log, serv, gatewayCfg.Host, gatewayCfg.Port, timeoutServer)

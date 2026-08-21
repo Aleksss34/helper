@@ -31,6 +31,7 @@ require (
 	github.com/lmittmann/tint v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/qdrant/go-client v1.19.0 // indirect
+	github.com/sashabaranov/go-openai v1.42.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/net v0.55.0 // indirect

@@ -6,10 +6,11 @@ import (
 )
 
 type SearcherService interface {
-	Search(ctx context.Context, question string, out chan<- string) error
+	Search(ctx context.Context, question string, server string, out chan<- string) error
 }
 type ParserService interface {
-	Parse(ctx context.Context) error
+	ParseWiki(ctx context.Context) error
+	ParseLegislation(ctx context.Context) error
 }
 type Parser struct {
 	log  *slog.Logger

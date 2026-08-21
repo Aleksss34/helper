@@ -18,6 +18,8 @@ func (q *Qdrant) Upsert(ctx context.Context, points []*dto.Point) error {
 			Payload: qdrant.NewValueMap(map[string]any{
 				"title":   p.Title,
 				"content": p.Content,
+				"server":  p.Server,
+				"URL":     p.URL,
 			})}
 		qdrantPoints = append(qdrantPoints, qdrantPoint)
 	}
@@ -27,7 +29,8 @@ func (q *Qdrant) Upsert(ctx context.Context, points []*dto.Point) error {
 	return nil
 }
 
-func (q *Qdrant) Get(ctx context.Context, embedding []float32) ([]*dto.Point, error) {
+func (q *Qdrant) Get(ctx context.Context, embedding []float32, server string) ([]*dto.Point, error) {
+
 	var op = "storage.qdrant.Get"
 	var resp []*dto.Point
 	var point *dto.Point
@@ -37,7 +40,12 @@ func (q *Qdrant) Get(ctx context.Context, embedding []float32) ([]*dto.Point, er
 		Query:          qdrant.NewQuery(embedding...),
 		Limit:          &q.limitPoints,
 		ScoreThreshold: &q.scoreThreshold,
-		WithPayload:    qdrant.NewWithPayload(true)})
+		WithPayload:    qdrant.NewWithPayload(true),
+		Filter: &qdrant.Filter{
+			Must: []*qdrant.Condition{
+				qdrant.NewMatchKeywords("server", server, "all"),
+			},
+		}})
 	if err != nil {
 		return nil, fmt.Errorf("%s:%w", op, err)
 	}
@@ -47,7 +55,8 @@ func (q *Qdrant) Get(ctx context.Context, embedding []float32) ([]*dto.Point, er
 		url := p.Payload["URL"].GetStringValue()
 		title := p.Payload["title"].GetStringValue()
 		content := p.Payload["content"].GetStringValue()
-		point = &dto.Point{Id: p.Id.GetNum(), URL: url, Title: title, Content: content}
+		serv := p.Payload["server"].GetStringValue()
+		point = &dto.Point{Id: p.Id.GetNum(), URL: url, Title: title, Content: content, Server: serv}
 		resp = append(resp, point)
 	}
 

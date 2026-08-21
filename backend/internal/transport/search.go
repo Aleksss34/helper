@@ -25,7 +25,7 @@ func (s *Searcher) Search(w http.ResponseWriter, r *http.Request) {
 	outChan := make(chan string)
 	go func() {
 		defer close(outChan)
-		if err := s.serv.Search(r.Context(), req.Question, outChan); err != nil {
+		if err := s.serv.Search(r.Context(), req.Question, req.Server, outChan); err != nil {
 			s.log.Error("Search failed", slog.Any("error", err))
 		}
 	}()

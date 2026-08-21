@@ -1,6 +1,7 @@
 package dto
 
 type Chunk struct {
+	Server       string `json:"server"`
 	ArticleTitle string `json:"article_title"`
 	SectionTitle string `json:"section_title,omitempty"`
 	SourceURL    string `json:"source_url"`
@@ -9,6 +10,7 @@ type Chunk struct {
 
 type Article struct {
 	Title   string
+	Server  string
 	URL     string
 	Content string
 }

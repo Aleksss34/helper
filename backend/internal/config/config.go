@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/joho/godotenv"
 )
 
 type GatewayConfig struct {
@@ -31,13 +32,16 @@ type QdrantConfig struct {
 type ParserConfig struct {
 	BrowserPath string `yaml:"browser-path"`
 }
+
 type Config struct {
-	Env           string         `yaml:"env"`
+	Env string `yaml:"env"`
+
 	TimeoutServer int64          `yaml:"timeout-server"`
 	Gateway       GatewayConfig  `yaml:"gateway"`
 	Postgres      PostgresConfig `yaml:"postgres"`
 	Parser        ParserConfig   `yaml:"parser"`
 	Qdrant        QdrantConfig   `yaml:"qdrant"`
+	ApiKeyGroq    string         `env:"KEY_GROQ"`
 }
 
 func MustLoad() *Config {
@@ -50,8 +54,12 @@ func MustLoad() *Config {
 
 func MustLoadPath(path string) *Config {
 	var cfg Config
+	_ = godotenv.Load()
 	if err := cleanenv.ReadConfig(path, &cfg); err != nil {
 		panic("Failed to unmarshal the config, error: " + err.Error())
+	}
+	if err := cleanenv.ReadEnv(&cfg); err != nil {
+		panic("Failed to read env variables, error: " + err.Error())
 	}
 	return &cfg
 }
