@@ -18,8 +18,8 @@ qdrant:
   port: 6334
   name-collection: "wiki-vectors"
   batch-size: 100
-  limit-points: 4
-  score-threshold: 0.5
+  limit-points: 10
+  score-threshold: 0.3
 
 parser:
   browser-path: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"

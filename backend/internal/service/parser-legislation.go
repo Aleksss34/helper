@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-
 	"strings"
 	"time"
 
@@ -43,9 +42,15 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 		panic("Не удалось открыть главную страницу форума, ошибка: " + err.Error())
 	}
 
+	//out, err := os.Create("forum_dump.txt")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//defer out.Close()
+
 	points := make([]*dto.Point, 0, p.batchSize)
-	var id uint64
-	id = 0
+	var id uint64 = 0
+
 	for i, idPage := range idPages {
 		serverName := serverNames[i]
 		currentURL := forumSectionUrl + idPage + "/"
@@ -64,9 +69,8 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 			}
 			title = strings.ReplaceAll(title, "ЗАКРЕПЛЕНО", "")
 			title = strings.ReplaceAll(title, "ИНФОРМАЦИЯ", "")
-
 			title = strings.TrimSpace(title)
-			//////
+
 			for _, content := range contents {
 				article := dto.Article{Title: title, Content: content, URL: t.URL, Server: serverName}
 				chunks := p.chunkLegislationArticle(article)
@@ -83,12 +87,12 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 						}
 						points = points[:0]
 					}
+					//fmt.Fprintf(out, "=== %s: %s (%s) ===\n%s\n\n", chunk.ArticleTitle, chunk.SectionTitle, chunk.Server, chunk.Text)
 					log.Info("Запаршен чанк", slog.Uint64("Номер", id))
 				}
 				log.Info("Запаршена статья", slog.Int("Номер", i+1), slog.String("заголовок", title))
 
 				time.Sleep(500 * time.Millisecond)
-
 			}
 		}
 	}
@@ -99,10 +103,10 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 		} else {
 			log.Info("Финальные поинтеры успешно сохранены")
 		}
-
 	}
 	return nil
 }
+
 func (p *Parser) getAllThreads(ctx context.Context, currentURL string) ([]ThreadEntry, error) {
 	var op = "service.parse-legislation.getAllThreads"
 	log := p.log.With(slog.String("op", op))
@@ -119,11 +123,6 @@ func (p *Parser) getAllThreads(ctx context.Context, currentURL string) ([]Thread
 			chromedp.Navigate(currentURL),
 			chromedp.WaitVisible(`body`, chromedp.ByQuery),
 			chromedp.Sleep(3*time.Second),
-
-			// Несколько вариантов селекторов под разные версии/темы XenForo:
-			// - .structItem-title a          (актуальный XenForo 2.x)
-			// - .structItemContainer a.structItem-title
-			// - a[data-tp-primary="on"]      (запасной, ссылка-заголовок темы)
 			chromedp.Evaluate(`
 				(() => {
 					const selectors = [
@@ -139,8 +138,6 @@ func (p *Parser) getAllThreads(ctx context.Context, currentURL string) ([]Thread
 							break;
 						}
 					}
-					// Дедуп внутри страницы + убираем служебные ссылки (например,
-					// на страницы внутри той же темы вида thread-name.123/page-2)
 					const seenHref = new Set();
 					const result = [];
 					for (const a of found) {
@@ -152,8 +149,6 @@ func (p *Parser) getAllThreads(ctx context.Context, currentURL string) ([]Thread
 					return result;
 				})()
 			`, &threads),
-
-			// Пагинация: ищем ссылку "Дальше"/"Next" внизу списка тем
 			chromedp.Evaluate(`
 				(() => {
 					const next = document.querySelector('.pageNav-jump--next, a.pageNav-jump--next');
@@ -188,21 +183,100 @@ func (p *Parser) getAllThreads(ctx context.Context, currentURL string) ([]Thread
 	return allThreads, nil
 }
 
-func (P *Parser) scrapePosts(ctx context.Context, url string) (title string, contents []string, err error) {
+func (p *Parser) scrapePosts(ctx context.Context, url string) (title string, contents []string, err error) {
 	var op = "service.parse-legislation.scrapePosts"
 	err = chromedp.Run(ctx,
 		chromedp.Navigate(url),
 		chromedp.WaitVisible(`.message-body`, chromedp.ByQuery),
 		chromedp.Sleep(1*time.Second),
 
-		// Заголовок темы
 		chromedp.Text(`.p-title-value`, &title, chromedp.NodeVisible),
 
-		// Получаем все сообщения
 		chromedp.Evaluate(`
 			(() => {
+				function tableToLines(table) {
+					const rows = Array.from(table.querySelectorAll('tr'));
+					if (rows.length === 0) return '';
+
+					let headerCells = [];
+					const blocks = [];
+
+					function checkHeader(row, cells) {
+						if (row.querySelectorAll('th').length > 0) return true;
+						
+						const rowText = cells.join(' ').toLowerCase();
+						if (rowText.includes('пояснение') || rowText.includes('полномочия') || rowText.includes('подчинение') || rowText.includes('должность')) {
+							return true;
+						}
+
+						return cells.length > 0 && cells.every((_, idx) => {
+							const cellEl = row.children[idx];
+							if (!cellEl) return false;
+							const text = cellEl.innerText.trim();
+							if (!text) return true;
+							const bold = cellEl.querySelector('b, strong');
+							return !!bold && bold.innerText.trim() === text;
+						});
+					}
+
+					for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+						const row = rows[rowIndex];
+						const cells = Array.from(row.querySelectorAll('td,th')).map(c => c.innerText.trim());
+						const nonEmpty = cells.filter(c => c.length > 0);
+
+						if (nonEmpty.length === 0) continue;
+
+						// Если заголовок таблицы ещё не найден и строка похожа на шапку
+						if (headerCells.length === 0 && checkHeader(row, cells)) {
+							headerCells = cells; // Сохраняем шапку
+							continue; // НЕ создаем отдельный чанк!
+						}
+
+						// Если строка-разделитель из 1 ячейки (colspan)
+						if (nonEmpty.length === 1 && headerCells.length === 0) {
+							blocks.push(nonEmpty[0]);
+							continue;
+						}
+
+						// Склеиваем заголовки колонок со значениями ячеек
+						let rowBlock = [];
+						cells.forEach((cell, i) => {
+							const label = headerCells[i] || '';
+							if (cell) {
+								if (label) {
+									rowBlock.push(label + ': ' + cell);
+								} else {
+									rowBlock.push(cell);
+								}
+							}
+						});
+
+						if (rowBlock.length > 0) {
+							blocks.push('[TABLE_BLOCK]\n' + rowBlock.join('\n') + '\n[/TABLE_BLOCK]');
+						}
+					}
+
+					return blocks.join('\n');
+				}
+
 				const els = document.querySelectorAll('.message--post .message-body .bbWrapper');
-				return Array.from(els).map(el => el.innerText.trim()).filter(text => text.length > 0);
+				return Array.from(els).map(el => {
+					const clone = el.cloneNode(true);
+					const tables = Array.from(clone.querySelectorAll('table'));
+
+					tables.forEach((table, idx) => {
+						const placeholder = document.createTextNode('\n[[TABLE_PLACEHOLDER_' + idx + ']]\n');
+						table.parentNode.replaceChild(placeholder, table);
+					});
+
+					let text = clone.innerText.trim();
+
+					tables.forEach((table, idx) => {
+						text = text.replace('[[TABLE_PLACEHOLDER_' + idx + ']]', tableToLines(table));
+					});
+
+					return text;
+				}).filter(text => text.length > 0);
 			})()
 		`, &contents),
 	)

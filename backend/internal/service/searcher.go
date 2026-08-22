@@ -30,8 +30,6 @@ func (s *Searcher) Search(ctx context.Context, question string, server string, o
 	}
 	possAnswer := ""
 	for _, p := range points {
-		///убрать
-		fmt.Println(p.Server)
 		possAnswer += fmt.Sprintf("%s\n\n", p.Content)
 	}
 	//тест мелкий промпт

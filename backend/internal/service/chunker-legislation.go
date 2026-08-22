@@ -11,12 +11,15 @@ import (
 
 var reDate = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}|\d{2}\.\d{4}|\d{2}\.\d{2}\.\d{4})`)
 var reAuthor = regexp.MustCompile(`^[A-Za-z]+_[A-Za-z]+(?:\s*,\s*[A-Za-z]+_[A-Za-z]+)*$`)
-var reArticle = regexp.MustCompile(`(?i)^Статья\s+\d+(?:\.\d+)*[\.\:]?\s+`)
+var reArticle = regexp.MustCompile(`(?i)^Статья\s+\d+(?:\.\d+)*[\.\:]?(\s+.*)?$`)
 var reChapter = regexp.MustCompile(`(?i)^ГЛАВА\s+\d+`)
 var reNumberedPart = regexp.MustCompile(`^\d+\.\s+\S`)
+var reClause = regexp.MustCompile(`^\d+\.\d+\.?\s+\S`)
+
+var reTableBlockStart = regexp.MustCompile(`^\[TABLE_BLOCK\]`)
+var reTableBlockEnd = regexp.MustCompile(`^\[/TABLE_BLOCK\]`)
 
 func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
-
 	var chunks []dto.Chunk
 	scanner := bufio.NewScanner(strings.NewReader(a.Content))
 
@@ -25,6 +28,45 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 		lines = append(lines, scanner.Text())
 	}
 	currentChapter := ""
+	var defaultBuffer []string
+
+	flushDefault := func() {
+		if len(defaultBuffer) == 0 {
+			return
+		}
+		text := strings.Join(defaultBuffer, "\n")
+		defaultBuffer = nil
+
+		sectionTitle := currentChapter
+		if sectionTitle == "" {
+			words := strings.Fields(text)
+			n := 6
+			if len(words) < n {
+				n = len(words)
+			}
+			sectionTitle = strings.Join(words[:n], " ")
+			if n < len(words) {
+				sectionTitle += "..."
+			}
+		}
+
+		textParts := p.splitLongText(sectionTitle, text, maxChunkWords)
+		for idx, part := range textParts {
+			partTitle := sectionTitle
+			if len(textParts) > 1 {
+				partTitle = fmt.Sprintf("%s (Часть %d/%d)", sectionTitle, idx+1, len(textParts))
+			}
+
+			chunks = append(chunks, dto.Chunk{
+				Server:       a.Server,
+				ArticleTitle: a.Title,
+				SectionTitle: partTitle,
+				SourceURL:    a.URL,
+				Text:         fmt.Sprintf("%s: %s:\n%s", a.Title, partTitle, part),
+			})
+		}
+	}
+
 	i := 0
 	for i < len(lines) {
 		line := p.cleanLine(lines[i])
@@ -34,15 +76,17 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 			continue
 		}
 
-		// 2. Если встретили главу — обновляем контекст и идем дальше
+		// 1. Глава
 		if reChapter.MatchString(line) {
+			flushDefault()
 			currentChapter = line
 			i++
 			continue
 		}
 
-		// 1. Лог изменений по дате
+		// 2. Лог изменений по дате
 		if dateMatch := reDate.FindString(line); dateMatch != "" {
+			flushDefault()
 			sectionTitle, text, newI := p.chunkChanges(dateMatch, i, lines)
 			chunks = append(chunks, dto.Chunk{
 				Server:       a.Server,
@@ -55,8 +99,9 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 			continue
 		}
 
-		// 2. Статья кодекса
+		// 3. Статья кодекса
 		if reArticle.MatchString(line) {
+			flushDefault()
 			sectionTitle, text, newI := p.chunkArticleBlock(i, lines)
 			if currentChapter != "" {
 				sectionTitle = fmt.Sprintf("%s: %s", currentChapter, sectionTitle)
@@ -64,7 +109,6 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 			textParts := p.splitLongText(sectionTitle, text, maxChunkWords)
 			for idx, part := range textParts {
 				partTitle := sectionTitle
-				// Если статья разбилась на несколько частей, добавляем префикс к Title
 				if len(textParts) > 1 {
 					partTitle = fmt.Sprintf("%s (Часть %d/%d)", sectionTitle, idx+1, len(textParts))
 				}
@@ -74,7 +118,7 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 					ArticleTitle: a.Title,
 					SectionTitle: partTitle,
 					SourceURL:    a.URL,
-					Text:         fmt.Sprintf("%s: %s:%s", a.Title, partTitle, part),
+					Text:         fmt.Sprintf("%s: %s:\n%s", a.Title, partTitle, part),
 				})
 			}
 
@@ -82,9 +126,84 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 			continue
 		}
 
+		// 4. Пункт ОУГ ("1.1. текст")
+		if reClause.MatchString(line) {
+			flushDefault()
+			sectionTitle, text, newI := p.chunkClauseBlock(i, lines)
+			if currentChapter != "" {
+				sectionTitle = fmt.Sprintf("%s: %s", currentChapter, sectionTitle)
+			}
+			textParts := p.splitLongText(sectionTitle, text, maxChunkWords)
+			for idx, part := range textParts {
+				partTitle := sectionTitle
+				if len(textParts) > 1 {
+					partTitle = fmt.Sprintf("%s (Часть %d/%d)", sectionTitle, idx+1, len(textParts))
+				}
+
+				chunks = append(chunks, dto.Chunk{
+					Server:       a.Server,
+					ArticleTitle: a.Title,
+					SectionTitle: partTitle,
+					SourceURL:    a.URL,
+					Text:         fmt.Sprintf("%s: %s:\n%s", a.Title, partTitle, part),
+				})
+			}
+
+			i = newI
+			continue
+		}
+
+		// 5. Полная строка/запись таблицы
+		if reTableBlockStart.MatchString(line) {
+			flushDefault()
+			i++ // пропускаем [TABLE_BLOCK]
+
+			var blockLines []string
+			for i < len(lines) {
+				current := p.cleanLine(lines[i])
+				if reTableBlockEnd.MatchString(current) {
+					i++ // пропускаем [/TABLE_BLOCK]
+					break
+				}
+				if !p.isIgnorableLine(current) {
+					blockLines = append(blockLines, current)
+				}
+				i++
+			}
+
+			if len(blockLines) > 0 {
+				sectionTitle := currentChapter
+				if sectionTitle == "" {
+					sectionTitle = a.Title
+				}
+
+				body := strings.Join(blockLines, "\n")
+				textParts := p.splitLongText(sectionTitle, body, maxChunkWords)
+
+				for idx, part := range textParts {
+					partTitle := sectionTitle
+					if len(textParts) > 1 {
+						partTitle = fmt.Sprintf("%s (Часть %d/%d)", sectionTitle, idx+1, len(textParts))
+					}
+
+					chunks = append(chunks, dto.Chunk{
+						Server:       a.Server,
+						ArticleTitle: a.Title,
+						SectionTitle: partTitle,
+						SourceURL:    a.URL,
+						Text:         part,
+					})
+				}
+			}
+			continue
+		}
+
+		// 6. Обычные подзаголовки/контекст вне стандартных правил
+		defaultBuffer = append(defaultBuffer, line)
 		i++
 	}
 
+	flushDefault()
 	return chunks
 }
 
@@ -105,11 +224,10 @@ func (p *Parser) chunkChanges(dateMatch string, startIndex int, lines []string) 
 			chunkLines = append(chunkLines, currentLine)
 		}
 
-		// Проверяем автора
 		if reAuthor.MatchString(currentLine) {
-			foundAuthor = currentLine // Берем всю строку с автором (например "Andrey_Bastrykin" или "Andrey_Bastrykin, Andrey_Chepkasov")
-			i++                       // Сдвигаем индекс за автора
-			break                     // Автор найден — закрываем чанк
+			foundAuthor = currentLine
+			i++
+			break
 		}
 
 		i++
@@ -127,12 +245,39 @@ func (p *Parser) chunkChanges(dateMatch string, startIndex int, lines []string) 
 
 func (p *Parser) chunkArticleBlock(startIndex int, lines []string) (string, string, int) {
 	var blockLines []string
-
-	// В качестве SectionTitle берем первую строку (заголовок статьи)
-
 	sectionTitle := p.cleanLine(lines[startIndex])
-	// Начинаем сбор со СЛЕДУЮЩЕЙ строки, чтобы не дублировать заголовок в тело
 	i := startIndex + 1
+
+	for i < len(lines) {
+		line := p.cleanLine(lines[i])
+
+		if p.isStartOfNewChunk(line) {
+			break
+		}
+
+		if !p.isIgnorableLine(line) {
+			blockLines = append(blockLines, line)
+		}
+		i++
+	}
+
+	text := strings.Join(blockLines, "\n")
+	return sectionTitle, text, i
+}
+
+var reClauseNumber = regexp.MustCompile(`^\d+\.\d+\.?`)
+
+func (p *Parser) chunkClauseBlock(startIndex int, lines []string) (string, string, int) {
+	firstLine := p.cleanLine(lines[startIndex])
+
+	sectionTitle := reClauseNumber.FindString(firstLine)
+	if sectionTitle == "" {
+		sectionTitle = firstLine
+	}
+
+	blockLines := []string{firstLine}
+	i := startIndex + 1
+
 	for i < len(lines) {
 		line := p.cleanLine(lines[i])
 
@@ -153,7 +298,9 @@ func (p *Parser) chunkArticleBlock(startIndex int, lines []string) (string, stri
 func (p *Parser) isStartOfNewChunk(line string) bool {
 	return reDate.MatchString(line) ||
 		reArticle.MatchString(line) ||
-		reChapter.MatchString(line)
+		reChapter.MatchString(line) ||
+		reClause.MatchString(line) ||
+		reTableBlockStart.MatchString(line)
 }
 
 func (p *Parser) isIgnorableLine(line string) bool {
@@ -163,7 +310,6 @@ func (p *Parser) isIgnorableLine(line string) bool {
 	}
 
 	lower := strings.ToLower(line)
-
 	if lower == "закреплено" || strings.Contains(lower, "закреплено") ||
 		strings.Contains(lower, "нажмите, чтобы") ||
 		strings.Contains(lower, "спойлер:") ||
@@ -175,7 +321,6 @@ func (p *Parser) isIgnorableLine(line string) bool {
 }
 
 func (p *Parser) cleanLine(s string) string {
-
 	s = strings.Trim(s, " \t\r\n\u200b\ufeff\u00a0")
 	return strings.TrimSpace(s)
 }
@@ -189,22 +334,18 @@ func (p *Parser) splitLongText(sectionTitle string, text string, maxWords int) [
 	}
 
 	lines := strings.Split(text, "\n")
-
-	// Сначала пробуем найти границы "естественных" частей статьи (1. 2. 3. ...)
 	var partBoundaries []int
+
 	for i, line := range lines {
 		if reNumberedPart.MatchString(strings.TrimSpace(line)) {
 			partBoundaries = append(partBoundaries, i)
 		}
 	}
 
-	// Если нашли достаточно естественных границ — режем строго по ним,
-	// не разрывая пронумерованные части и их подпункты
 	if len(partBoundaries) >= 2 {
 		return p.splitByBoundaries(lines, partBoundaries, maxWords)
 	}
 
-	// Иначе — запасной вариант
 	return p.splitByWordCount(text, maxWords)
 }
 
@@ -227,9 +368,6 @@ func (p *Parser) splitByBoundaries(lines []string, boundaries []int, maxWords in
 	}
 
 	for i, line := range lines {
-		// Режем ТОЛЬКО на границе новой пронумерованной части, и только
-		// если уже накопили достаточно слов — не создаём микро-чанки
-		// на каждую часть по отдельности
 		if boundarySet[i] && currentWords >= maxWords/2 && len(current) > 0 {
 			flush()
 		}
@@ -238,9 +376,6 @@ func (p *Parser) splitByBoundaries(lines []string, boundaries []int, maxWords in
 	}
 	flush()
 
-	// Пост-обработка: любой кусок, всё ещё превышающий лимит (объёмная
-	// пронумерованная часть сама по себе, или длинный хвост без номеров
-	// после последней границы), досекается словной разбивкой
 	var finalParts []string
 	for _, part := range rawParts {
 		if len(strings.Fields(part)) > maxWords {
@@ -257,8 +392,6 @@ func (p *Parser) splitByWordCount(text string, maxWords int) []string {
 	words := strings.Fields(text)
 	totalWords := len(words)
 
-	// Вычисляем, на сколько РАВНЫХ частей нужно разбить статью
-	// Например: 360 слов при лимите 250 -> 2 части по ~180 слов каждая
 	numParts := (totalWords + maxWords - 1) / maxWords
 	targetWordsPerPart := totalWords / numParts
 
@@ -270,8 +403,6 @@ func (p *Parser) splitByWordCount(text string, maxWords int) []string {
 	for _, line := range lines {
 		lineWords := len(strings.Fields(line))
 
-		// Если набрали целевую "половину" (или треть) и буфер не пустой,
-		// и это не последняя часть — закрываем текущий чанк
 		if currentWordCount >= targetWordsPerPart && len(subChunks) < numParts-1 && len(currentLines) > 0 {
 			subChunks = append(subChunks, strings.Join(currentLines, "\n"))
 			currentLines = nil
