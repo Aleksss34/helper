@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/pkg/bm25"
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/ollama/ollama/api"
@@ -13,7 +14,7 @@ import (
 
 type Qdrant interface {
 	Upsert(ctx context.Context, points []*dto.Point) error
-	Get(ctx context.Context, embedding []float32, server string) ([]*dto.Point, error)
+	Get(ctx context.Context, embedding, sparseVal []float32, sparseIdx []uint32, server string) ([]*dto.Point, error)
 }
 
 type Parser struct {
@@ -22,13 +23,15 @@ type Parser struct {
 	ollamaClient *api.Client
 	browserPath  string
 	batchSize    int
+	vocab        *bm25.Vocabulary
+	avgDL        *bm25.AvgDocLength
 	qdrant       Qdrant
 }
 
 type Searcher struct {
 	log          *slog.Logger
 	ollamaClient *api.Client
-
+	vocab        *bm25.Vocabulary
 	qdrant       Qdrant
 	openaiClient *openai.Client
 }
@@ -37,13 +40,13 @@ type Service struct {
 	Searcher *Searcher
 }
 
-func NewParser(log *slog.Logger, httpClient *http.Client, ollamaClient *api.Client, browserPath string, qdrant Qdrant, batchSize int) *Parser {
+func NewParser(log *slog.Logger, httpClient *http.Client, ollamaClient *api.Client, browserPath string, qdrant Qdrant, batchSize int, vocab *bm25.Vocabulary, avgDL *bm25.AvgDocLength) *Parser {
 
-	return &Parser{log: log, httpClient: httpClient, ollamaClient: ollamaClient, browserPath: browserPath, qdrant: qdrant, batchSize: batchSize}
+	return &Parser{log: log, httpClient: httpClient, ollamaClient: ollamaClient, browserPath: browserPath, qdrant: qdrant, batchSize: batchSize, vocab: vocab, avgDL: avgDL}
 }
-func NewSearcher(log *slog.Logger, qdrant Qdrant, ollamaClient *api.Client, openaiClient *openai.Client) *Searcher {
+func NewSearcher(log *slog.Logger, qdrant Qdrant, ollamaClient *api.Client, openaiClient *openai.Client, vocab *bm25.Vocabulary) *Searcher {
 
-	return &Searcher{log: log, qdrant: qdrant, ollamaClient: ollamaClient, openaiClient: openaiClient}
+	return &Searcher{log: log, qdrant: qdrant, ollamaClient: ollamaClient, openaiClient: openaiClient, vocab: vocab}
 }
 
 func NewService(parser *Parser, searcher *Searcher) *Service {

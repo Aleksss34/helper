@@ -25,6 +25,7 @@ type ThreadEntry struct {
 func (p *Parser) ParseLegislation(ctx context.Context) error {
 	var op = "service.parser.ParseLegislation"
 	log := p.log.With(slog.String("op", op))
+
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.ExecPath(p.browserPath),
 	)
@@ -77,14 +78,19 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 
 				for _, chunk := range chunks {
 					id++
-					point := p.getPoint(ctx, chunk, id)
+
+					point := p.getPoint(ctx, chunk, id, p.vocab, p.avgDL)
 					points = append(points, point)
 					if len(points) >= p.batchSize {
 						if err = p.qdrant.Upsert(ctx, points); err != nil {
 							log.Error("Не удалось сохранить поинтеры в qdrant", slog.Any("error", err))
 						} else {
 							log.Info("Поинтеры успешно сохранены")
+							if err := p.vocab.Save(); err != nil {
+								log.Error("не удалось сохранить bm25-словарь", slog.Any("error", err))
+							}
 						}
+
 						points = points[:0]
 					}
 					//fmt.Fprintf(out, "=== %s: %s (%s) ===\n%s\n\n", chunk.ArticleTitle, chunk.SectionTitle, chunk.Server, chunk.Text)
@@ -102,6 +108,9 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 			log.Error("Не удалось сохранить поинтеры в qdrant", slog.Any("error", err))
 		} else {
 			log.Info("Финальные поинтеры успешно сохранены")
+			if err := p.vocab.Save(); err != nil {
+				log.Error("не удалось сохранить bm25-словарь", slog.Any("error", err))
+			}
 		}
 	}
 	return nil

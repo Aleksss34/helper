@@ -2,16 +2,15 @@ package main
 
 import (
 	"context"
-
-	"github.com/Aleksss34/helper/backend/internal/app"
-	"github.com/Aleksss34/helper/backend/internal/config"
-	"github.com/Aleksss34/helper/backend/internal/domain"
-
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/Aleksss34/helper/backend/internal/app"
+	"github.com/Aleksss34/helper/backend/internal/config"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 
 	"github.com/lmittmann/tint"
 )
@@ -23,6 +22,7 @@ const ProdEnv = "prod"
 func main() {
 	var op = "cmd.Main"
 	ctx := context.Background()
+
 	cfg := config.MustLoad()
 	log := setupLogger(cfg.Env)
 	params := domain.PostgresParams{

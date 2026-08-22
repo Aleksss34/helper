@@ -7,3 +7,7 @@
 #*.local.yaml
 #.env
 .idea/
+data/
+bm25_vocab.json
+forum_dump.txt
+forum_dump2.txt

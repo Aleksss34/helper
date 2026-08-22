@@ -11,6 +11,7 @@ import (
 	"github.com/Aleksss34/helper/backend/internal/domain"
 	"github.com/Aleksss34/helper/backend/internal/service"
 	"github.com/Aleksss34/helper/backend/internal/storage"
+	"github.com/Aleksss34/helper/pkg/bm25"
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/ollama/ollama/api"
@@ -30,6 +31,9 @@ func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, ga
 	if err != nil {
 		panic("Failed connection with Postgres, error: " + err.Error())
 	}
+
+	log.Info("подключаюсь к qdrant", slog.String("host", qdrantCfg.Host), slog.Int("port", qdrantCfg.Port), slog.String("collection", qdrantCfg.NameCollection))
+
 	httpClient := &http.Client{Timeout: 40 * time.Second}
 	ollamaClient, err := api.ClientFromEnvironment()
 	if err != nil {
@@ -38,9 +42,13 @@ func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, ga
 	cfgOpenai := openai.DefaultConfig(apiKey)
 	cfgOpenai.BaseURL = "https://api.groq.com/openai/v1"
 	clientOpenAi := openai.NewClientWithConfig(cfgOpenai)
-
-	parserService := service.NewParser(log, httpClient, ollamaClient, parserCfg.BrowserPath, qdr, qdrantCfg.BatchSize)
-	searcherService := service.NewSearcher(log, qdr, ollamaClient, clientOpenAi)
+	avgDL := bm25.NewAvgDocLength(120)
+	vocab, err := bm25.LoadVocabulary("bm25_vocab.json")
+	if err != nil {
+		panic(err)
+	}
+	parserService := service.NewParser(log, httpClient, ollamaClient, parserCfg.BrowserPath, qdr, qdrantCfg.BatchSize, vocab, avgDL)
+	searcherService := service.NewSearcher(log, qdr, ollamaClient, clientOpenAi, vocab)
 	serv := service.NewService(parserService, searcherService)
 
 	serverApp := restapp.New(log, serv, gatewayCfg.Host, gatewayCfg.Port, timeoutServer)
@@ -50,19 +58,33 @@ func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, ga
 func ensureCollectionExists(ctx context.Context, client *qdrant.Client, collectionName string) {
 	ok, err := client.CollectionExists(ctx, collectionName)
 	if err != nil {
-		panic("Не удалось проверить существование коллекции qdrant, ошибка:" + err.Error())
+		panic("Не удалось проверить существование коллекции qdrant, ошибка: " + err.Error())
 	}
+
 	if ok {
 		return
 	}
+
 	if err = client.CreateCollection(ctx, &qdrant.CreateCollection{
 		CollectionName: collectionName,
-		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-			Size:     1024,
-			Distance: qdrant.Distance_Cosine},
+
+		VectorsConfig: qdrant.NewVectorsConfigMap(
+			map[string]*qdrant.VectorParams{
+				"dense": {
+					Size:     1024,
+					Distance: qdrant.Distance_Cosine,
+				},
+			},
 		),
-	},
-	); err != nil {
+
+		SparseVectorsConfig: qdrant.NewSparseVectorsConfig(
+			map[string]*qdrant.SparseVectorParams{
+				"sparse": {
+					Modifier: qdrant.Modifier_Idf.Enum(),
+				},
+			},
+		),
+	}); err != nil {
 		panic("Не удалось создать коллекцию, ошибка: " + err.Error())
 	}
 }

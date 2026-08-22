@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/Aleksss34/helper/pkg/bm25"
 	"github.com/ollama/ollama/api"
 	"github.com/sashabaranov/go-openai"
 )
@@ -22,8 +23,8 @@ func (s *Searcher) Search(ctx context.Context, question string, server string, o
 	if err != nil {
 		log.Error("Не удалось получить эмбеддинг от bge-m3", slog.Any("error", err))
 	}
-
-	points, err := s.qdrant.Get(ctx, embeddings.Embeddings[0], server)
+	sparseIdx, sparseVal := bm25.QuerySparseVector(s.vocab, question)
+	points, err := s.qdrant.Get(ctx, embeddings.Embeddings[0], sparseVal, sparseIdx, server)
 	if err != nil {
 		log.Error("Не удалось получить совпадающие вектора", slog.Any("error", err))
 		return fmt.Errorf("%s:%w", op, err)

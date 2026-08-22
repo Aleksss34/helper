@@ -2,7 +2,9 @@ package dto
 
 type Point struct {
 	Id        uint64
-	Embedding []float32
+	Dense     []float32
+	SparseIdx []uint32
+	SparseVal []float32
 	Server    string
 	Title     string
 	Content   string

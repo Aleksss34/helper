@@ -28,6 +28,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/kljensen/snowball v0.10.0 // indirect
 	github.com/lmittmann/tint v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/qdrant/go-client v1.19.0 // indirect

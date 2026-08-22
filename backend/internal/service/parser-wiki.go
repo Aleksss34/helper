@@ -71,7 +71,7 @@ func (p *Parser) ParseWiki(ctx context.Context) error {
 		chunks := p.chunkWikiArticle(article)
 		for _, chunk := range chunks {
 			id++
-			point := p.getPoint(ctx, chunk, id)
+			point := p.getPoint(ctx, chunk, id, p.vocab, p.avgDL)
 			points = append(points, point)
 			if len(points) >= p.batchSize {
 				if err = p.qdrant.Upsert(ctx, points); err != nil {
