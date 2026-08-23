@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 
 	"github.com/Aleksss34/helper/backend/internal/dto"
-	"github.com/Aleksss34/helper/pkg/bm25"
+	targeted_search "github.com/Aleksss34/helper/backend/internal/service/targeted-search"
+	"github.com/Aleksss34/helper/backend/pkg/bm25"
 	"github.com/ollama/ollama/api"
 )
 
@@ -30,9 +32,15 @@ func (p *Parser) getPoint(ctx context.Context, chunk dto.Chunk, id uint64, vocab
 		Content:       chunk.Text,
 		URL:           chunk.SourceURL,
 		Server:        chunk.Server,
-		ArticleNumber: ExtractArticleNumber(chunk.SectionTitle),
+		ArticleNumber: targeted_search.ExtractArticleNumber(chunk.SectionTitle),
 		ArticleTitle:  chunk.ArticleTitle,
-		ChapterNumber: ExtractChapterNumber(chunk.SectionTitle),
+		ChapterNumber: targeted_search.ExtractChapterNumber(chunk.SectionTitle),
 	}
 	return point
+}
+
+func (p *Parser) hashToUint64(s string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	return h.Sum64()
 }

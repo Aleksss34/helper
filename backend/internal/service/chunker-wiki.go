@@ -32,6 +32,7 @@ func (p *Parser) chunkWikiArticle(a dto.Article) []dto.Chunk {
 			ArticleTitle: a.Title,
 			SourceURL:    a.URL,
 			Text:         fmt.Sprintf("%s. %s", a.Title, a.Content),
+			Server:       a.Server,
 		}}
 	}
 
@@ -53,7 +54,7 @@ func (p *Parser) chunkWikiArticle(a dto.Article) []dto.Chunk {
 		// автобуса") тащит в контекст текст про 9 других профессий,
 		// упомянутых в том же разделе.
 		if p.isListLikeSection(sec.Content) {
-			chunks = append(chunks, p.chunkListSection(a.Title, sec.Heading, sec.Content, a.URL)...)
+			chunks = append(chunks, p.chunkListSection(a.Title, sec.Heading, sec.Content, a.URL, a.Server)...)
 			continue
 		}
 
@@ -63,6 +64,7 @@ func (p *Parser) chunkWikiArticle(a dto.Article) []dto.Chunk {
 			SectionTitle: sec.Heading,
 			SourceURL:    a.URL,
 			Text:         text,
+			Server:       a.Server,
 		})
 	}
 
@@ -102,7 +104,7 @@ func (p *Parser) isListLikeSection(content string) bool {
 // chunkListSection режет списочный раздел по отдельным пунктам — каждая
 // строка вида "Название - текст" становится своим чанком с указанием,
 // к какой статье/разделу/сущности он относится.
-func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url string) []dto.Chunk {
+func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url, server string) []dto.Chunk {
 	lines := strings.Split(content, "\n")
 
 	var chunks []dto.Chunk
@@ -121,6 +123,7 @@ func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url str
 				SectionTitle: sectionHeading,
 				SourceURL:    url,
 				Text:         fmt.Sprintf("%s. %s: %s", articleTitle, sectionHeading, line),
+				Server:       server,
 			})
 			continue
 		}
@@ -134,6 +137,7 @@ func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url str
 			SectionTitle: sectionHeading + " — " + entityName,
 			SourceURL:    url,
 			Text:         text,
+			Server:       server,
 		})
 	}
 
@@ -145,6 +149,7 @@ func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url str
 			SectionTitle: sectionHeading,
 			SourceURL:    url,
 			Text:         fmt.Sprintf("%s. %s: %s", articleTitle, sectionHeading, content),
+			Server:       server,
 		}}
 	}
 
@@ -286,6 +291,7 @@ func (p *Parser) chunkByParagraphs(a dto.Article) []dto.Chunk {
 			ArticleTitle: a.Title,
 			SourceURL:    a.URL,
 			Text:         fmt.Sprintf("%s. %s", a.Title, text),
+			Server:       a.Server,
 		})
 		buf.Reset()
 		wordCount = 0
@@ -312,6 +318,7 @@ func (p *Parser) chunkByParagraphs(a dto.Article) []dto.Chunk {
 			ArticleTitle: a.Title,
 			SourceURL:    a.URL,
 			Text:         fmt.Sprintf("%s. %s", a.Title, a.Content),
+			Server:       a.Server,
 		})
 	}
 	return chunks

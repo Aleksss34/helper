@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,13 +72,17 @@ func (p *Parser) ParseWiki(ctx context.Context) error {
 		chunks := p.chunkWikiArticle(article)
 		for _, chunk := range chunks {
 			id++
-			point := p.getPoint(ctx, chunk, id, p.vocab, p.avgDL)
+			pointId := p.hashToUint64(chunk.SourceURL + "#" + strconv.Itoa(int(id)))
+			point := p.getPoint(ctx, chunk, pointId, p.vocab, p.avgDL)
 			points = append(points, point)
 			if len(points) >= p.batchSize {
 				if err = p.qdrant.Upsert(ctx, points); err != nil {
 					log.Error("Не удалось сохранить поинтеры в qdrant", slog.Any("error", err))
 				} else {
 					log.Info("Поинтеры успешно сохранены")
+					if err := p.vocab.Save(); err != nil {
+						log.Error("не удалось сохранить bm25-словарь", slog.Any("error", err))
+					}
 				}
 				points = points[:0]
 			}

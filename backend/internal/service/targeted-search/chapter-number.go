@@ -1,4 +1,4 @@
-package service
+package targeted_search
 
 import "regexp"
 

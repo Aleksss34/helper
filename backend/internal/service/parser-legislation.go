@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -78,8 +79,8 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 
 				for _, chunk := range chunks {
 					id++
-
-					point := p.getPoint(ctx, chunk, id, p.vocab, p.avgDL)
+					pointId := p.hashToUint64(chunk.SourceURL + "#" + strconv.Itoa(int(id)))
+					point := p.getPoint(ctx, chunk, pointId, p.vocab, p.avgDL)
 					points = append(points, point)
 					if len(points) >= p.batchSize {
 						if err = p.qdrant.Upsert(ctx, points); err != nil {

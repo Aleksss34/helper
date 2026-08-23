@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Aleksss34/helper/backend/internal/dto"
-	"github.com/Aleksss34/helper/pkg/bm25"
+	"github.com/Aleksss34/helper/backend/pkg/bm25"
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/ollama/ollama/api"

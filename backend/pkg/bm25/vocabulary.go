@@ -2,7 +2,6 @@ package bm25
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -184,7 +183,7 @@ func Tokenize(text string) []string {
 		stemmed := russian.Stem(w, false)
 		tokens = append(tokens, stemmed)
 	}
-	fmt.Println(tokens)
+
 	return tokens
 }
 

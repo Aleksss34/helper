@@ -11,7 +11,8 @@ import (
 	"unicode"
 
 	"github.com/Aleksss34/helper/backend/internal/dto"
-	"github.com/Aleksss34/helper/pkg/bm25"
+	targeted_search "github.com/Aleksss34/helper/backend/internal/service/targeted-search"
+	"github.com/Aleksss34/helper/backend/pkg/bm25"
 	"github.com/ollama/ollama/api"
 	"github.com/sashabaranov/go-openai"
 )
@@ -100,9 +101,9 @@ func (s *Searcher) retrievePoints(
 	log *slog.Logger,
 ) ([]*dto.Point, error) {
 
-	lawName := detectLawName(question)
+	lawName := targeted_search.DetectLawName(question)
 
-	articleNumber := ExtractArticleNumber(question)
+	articleNumber := targeted_search.ExtractArticleNumber(question)
 
 	if articleNumber != "" {
 
@@ -177,7 +178,7 @@ func (s *Searcher) retrievePoints(
 
 	// сюда попадаем, если номер статьи не найден в вопросе вообще,
 	// либо если он найден, но ни точный поиск, ни подстатьи ничего не дали
-	if chapterNumber := ExtractChapterNumber(question); chapterNumber != "" {
+	if chapterNumber := targeted_search.ExtractChapterNumber(question); chapterNumber != "" {
 
 		log.Info(
 			"обнаружен запрос главы",

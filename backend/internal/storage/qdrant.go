@@ -41,7 +41,7 @@ func (q *Qdrant) Upsert(ctx context.Context, points []*dto.Point) error {
 		qdrantPoints = append(qdrantPoints, qdrantPoint)
 	}
 
-	res, err := q.db.Upsert(ctx, &qdrant.UpsertPoints{
+	_, err := q.db.Upsert(ctx, &qdrant.UpsertPoints{
 		CollectionName: q.collectionName,
 		Points:         qdrantPoints,
 		Wait:           qdrant.PtrOf(true),
@@ -49,11 +49,7 @@ func (q *Qdrant) Upsert(ctx context.Context, points []*dto.Point) error {
 	if err != nil {
 		return fmt.Errorf("%s:%w", op, err)
 	}
-	fmt.Println(res.GetStatus())
-	info, err := q.db.GetCollectionInfo(ctx, q.collectionName)
-	if err == nil {
-		fmt.Println(info.GetPointsCount())
-	}
+
 	return nil
 }
 

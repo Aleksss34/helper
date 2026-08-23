@@ -11,7 +11,7 @@ import (
 	"github.com/Aleksss34/helper/backend/internal/domain"
 	"github.com/Aleksss34/helper/backend/internal/service"
 	"github.com/Aleksss34/helper/backend/internal/storage"
-	"github.com/Aleksss34/helper/pkg/bm25"
+	"github.com/Aleksss34/helper/backend/pkg/bm25"
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/ollama/ollama/api"

@@ -1,4 +1,4 @@
-package service
+package targeted_search
 
 import "strings"
 
@@ -63,12 +63,12 @@ var priorityOrder = []string{
 	"конституци",
 }
 
-// detectLawName ищет в вопросе упоминание одного из известных законов и
+// DetectLawName ищет в вопросе упоминание одного из известных законов и
 // возвращает каноническое название (точно как в payload), либо "" если
 // ничего не нашлось — в этом случае вызывающий код должен либо
 // фильтровать только по номеру (без уточнения закона), либо уйти в
 // обычный гибридный поиск.
-func detectLawName(question string) string {
+func DetectLawName(question string) string {
 	lower := strings.ToLower(question)
 	for _, key := range priorityOrder {
 		if strings.Contains(lower, key) {
