@@ -3,6 +3,9 @@ package storage
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/Aleksss34/helper/backend/internal/dto"
 
@@ -17,10 +20,7 @@ func (q *Qdrant) Upsert(ctx context.Context, points []*dto.Point) error {
 		vectors := map[string]*qdrant.Vector{
 			"dense": qdrant.NewVector(p.Dense...),
 		}
-		// Sparse-вектор добавляем, только если он реально есть -
-		// точка без "sparse" ключа просто не будет участвовать в
-		// sparse-поиске, но это не ошибка (например, если для чанка
-		// не нашлось ни одного значащего токена после Tokenize).
+
 		if len(p.SparseIdx) > 0 {
 			vectors["sparse"] = qdrant.NewVectorSparse(p.SparseIdx, p.SparseVal)
 		}
@@ -29,10 +29,13 @@ func (q *Qdrant) Upsert(ctx context.Context, points []*dto.Point) error {
 			Id:      qdrant.NewIDNum(p.Id),
 			Vectors: qdrant.NewVectorsMap(vectors),
 			Payload: qdrant.NewValueMap(map[string]any{
-				"title":   p.Title,
-				"content": p.Content,
-				"server":  p.Server,
-				"URL":     p.URL,
+				"title":          p.Title,
+				"content":        p.Content,
+				"server":         p.Server,
+				"URL":            p.URL,
+				"article_number": p.ArticleNumber,
+				"article_title":  p.ArticleTitle,
+				"chapter_number": p.ChapterNumber,
 			}),
 		}
 		qdrantPoints = append(qdrantPoints, qdrantPoint)
@@ -54,6 +57,145 @@ func (q *Qdrant) Upsert(ctx context.Context, points []*dto.Point) error {
 	return nil
 }
 
+func (q *Qdrant) EnsureExactFilterIndexes(ctx context.Context) error {
+	var op = "storage.qdrant.EnsureExactFilterIndexes"
+
+	fields := []string{"article_number", "article_title"}
+	for _, field := range fields {
+		_, err := q.db.CreateFieldIndex(ctx, &qdrant.CreateFieldIndexCollection{
+			CollectionName: q.collectionName,
+			FieldName:      field,
+			FieldType:      qdrant.FieldType_FieldTypeKeyword.Enum(),
+		})
+		if err != nil {
+			return fmt.Errorf("%s: индекс на поле %s: %w", op, field, err)
+		}
+	}
+	return nil
+}
+func (q *Qdrant) ExactSearch(ctx context.Context, articleNumber, articleTitle, server string) ([]*dto.Point, error) {
+	var op = "storage.qdrant.ExactSearch"
+
+	if articleNumber == "" {
+		return nil, fmt.Errorf("%s: articleNumber не может быть пустым", op)
+	}
+
+	must := []*qdrant.Condition{
+		qdrant.NewMatch("article_number", articleNumber),
+	}
+	if articleTitle != "" {
+		must = append(must, qdrant.NewMatch("article_title", articleTitle))
+	}
+	if server != "" {
+		must = append(must, qdrant.NewMatchKeywords("server", server, "all"))
+	}
+
+	result, err := q.db.Scroll(ctx, &qdrant.ScrollPoints{
+		CollectionName: q.collectionName,
+		Filter:         &qdrant.Filter{Must: must},
+		Limit:          qdrant.PtrOf(uint32(10)),
+		WithPayload:    qdrant.NewWithPayload(true),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s:%w", op, err)
+	}
+
+	var points []*dto.Point
+	for _, p := range result {
+		points = append(points, &dto.Point{
+			Id:            p.Id.GetNum(),
+			Title:         p.Payload["title"].GetStringValue(),
+			Content:       p.Payload["content"].GetStringValue(),
+			URL:           p.Payload["URL"].GetStringValue(),
+			Server:        p.Payload["server"].GetStringValue(),
+			ArticleNumber: p.Payload["article_number"].GetStringValue(),
+			ArticleTitle:  p.Payload["article_title"].GetStringValue(),
+		})
+	}
+	return points, nil
+}
+
+// SearchByChapter возвращает ВСЕ точки (статьи), относящиеся к указанной
+// главе указанного закона, отсортированные по номеру статьи по
+// возрастанию — порядок важен, т.к. далее эти чанки уходят в LLM как
+// единый последовательный текст главы.
+func (q *Qdrant) SearchByChapter(
+	ctx context.Context,
+	chapterNumber string,
+	lawName string,
+	server string,
+) ([]*dto.Point, error) {
+
+	must := []*qdrant.Condition{
+		qdrant.NewMatch("chapter_number", chapterNumber),
+	}
+
+	if lawName != "" {
+		must = append(must, qdrant.NewMatch("article_title", lawName))
+	}
+	if server != "" {
+		must = append(must, qdrant.NewMatchKeywords("server", server, "all"))
+	}
+	filter := &qdrant.Filter{
+		Must: must,
+	}
+
+	res, err := q.db.Scroll(ctx, &qdrant.ScrollPoints{
+		CollectionName: q.collectionName,
+		Filter:         filter,
+		Limit:          qdrant.PtrOf(uint32(20)),
+		WithPayload:    qdrant.NewWithPayload(true),
+		WithVectors:    qdrant.NewWithVectorsEnable(false),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scroll по главе %s: %w", chapterNumber, err)
+	}
+
+	points := make([]*dto.Point, 0, len(res))
+	for _, p := range res {
+		points = append(points, &dto.Point{
+			Id:            p.Id.GetNum(),
+			Title:         p.Payload["title"].GetStringValue(),
+			Content:       p.Payload["content"].GetStringValue(),
+			URL:           p.Payload["URL"].GetStringValue(),
+			Server:        p.Payload["server"].GetStringValue(),
+			ArticleNumber: p.Payload["article_number"].GetStringValue(),
+			ArticleTitle:  p.Payload["article_title"].GetStringValue(),
+		})
+
+	}
+
+	sort.Slice(points, func(i, j int) bool {
+		return articleNumberLess(points[i].ArticleNumber, points[j].ArticleNumber)
+	})
+
+	return points, nil
+}
+
+// articleNumberLess сравнивает номера статей вида "9", "9.5", "13.11"
+// как числа, а не строки, чтобы "10" не оказалось перед "2" и "9.2"
+// шло раньше "9.10".
+func articleNumberLess(a, b string) bool {
+	aParts := strings.SplitN(a, ".", 2)
+	bParts := strings.SplitN(b, ".", 2)
+
+	aMain, _ := strconv.Atoi(aParts[0])
+	bMain, _ := strconv.Atoi(bParts[0])
+
+	if aMain != bMain {
+		return aMain < bMain
+	}
+
+	var aSub, bSub int
+	if len(aParts) > 1 {
+		aSub, _ = strconv.Atoi(aParts[1])
+	}
+	if len(bParts) > 1 {
+		bSub, _ = strconv.Atoi(bParts[1])
+	}
+
+	return aSub < bSub
+}
 func (q *Qdrant) Get(ctx context.Context, dense, sparseVal []float32, sparseIdx []uint32, server string) ([]*dto.Point, error) {
 
 	var op = "storage.qdrant.Get"
@@ -100,7 +242,7 @@ func (q *Qdrant) Get(ctx context.Context, dense, sparseVal []float32, sparseIdx 
 	return resp, nil
 }
 
-//тестовый
+// тестовый
 //func (q *Qdrant) Get(
 //	ctx context.Context,
 //	dense []float32,
@@ -167,3 +309,60 @@ func (q *Qdrant) Get(ctx context.Context, dense, sparseVal []float32, sparseIdx 
 //
 //	return nil, nil
 //}
+
+func (q *Qdrant) SearchSubArticles(
+	ctx context.Context,
+	articleNumber string,
+	lawName string,
+	server string,
+) ([]*dto.Point, error) {
+
+	var op = "storage.qdrant.SearchSubArticles"
+
+	must := []*qdrant.Condition{
+		qdrant.NewMatchKeywords("article_title", lawName, "all"),
+		qdrant.NewMatchKeywords("server", server, "all"),
+	}
+
+	var result []*dto.Point
+
+	// Для запроса статьи "9" ищем "9.1", "9.2", "9.3"...
+	prefix := articleNumber + "."
+
+	points, err := q.db.Scroll(ctx, &qdrant.ScrollPoints{
+		CollectionName: q.collectionName,
+		Filter: &qdrant.Filter{
+			Must: must,
+		},
+		WithPayload: qdrant.NewWithPayload(true),
+		Limit:       qdrant.PtrOf(uint32(100)),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	for _, p := range points {
+		if p.Payload == nil {
+			continue
+		}
+
+		foundArticleNumber := p.Payload["article_number"].GetStringValue()
+
+		if !strings.HasPrefix(foundArticleNumber, prefix) {
+			continue
+		}
+
+		result = append(result, &dto.Point{
+			Id:            p.Id.GetNum(),
+			URL:           p.Payload["URL"].GetStringValue(),
+			Title:         p.Payload["title"].GetStringValue(),
+			Content:       p.Payload["content"].GetStringValue(),
+			Server:        p.Payload["server"].GetStringValue(),
+			ArticleNumber: foundArticleNumber,
+			ArticleTitle:  p.Payload["article_title"].GetStringValue(),
+		})
+	}
+
+	return result, nil
+}

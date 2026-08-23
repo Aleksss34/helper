@@ -32,7 +32,9 @@ func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, ga
 		panic("Failed connection with Postgres, error: " + err.Error())
 	}
 
-	log.Info("подключаюсь к qdrant", slog.String("host", qdrantCfg.Host), slog.Int("port", qdrantCfg.Port), slog.String("collection", qdrantCfg.NameCollection))
+	if err := qdr.EnsureExactFilterIndexes(ctx); err != nil {
+		panic("Не удалось создать keyboard индексы")
+	}
 
 	httpClient := &http.Client{Timeout: 40 * time.Second}
 	ollamaClient, err := api.ClientFromEnvironment()

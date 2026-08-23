@@ -15,6 +15,9 @@ import (
 type Qdrant interface {
 	Upsert(ctx context.Context, points []*dto.Point) error
 	Get(ctx context.Context, embedding, sparseVal []float32, sparseIdx []uint32, server string) ([]*dto.Point, error)
+	ExactSearch(ctx context.Context, articleNumber, articleTitle, server string) ([]*dto.Point, error)
+	SearchSubArticles(ctx context.Context, articleNumber string, lawName string, server string) ([]*dto.Point, error)
+	SearchByChapter(ctx context.Context, chapterNumber string, lawName string, server string) ([]*dto.Point, error)
 }
 
 type Parser struct {

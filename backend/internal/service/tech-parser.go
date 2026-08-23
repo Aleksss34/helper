@@ -22,14 +22,17 @@ func (p *Parser) getPoint(ctx context.Context, chunk dto.Chunk, id uint64, vocab
 	}
 	sparseIdx, sparseVal := bm25.SparseVector(vocab, avgDL, chunk.Text)
 	point := &dto.Point{
-		Id:        id,
-		Dense:     resp.Embeddings[0],
-		SparseVal: sparseVal,
-		SparseIdx: sparseIdx,
-		Title:     fmt.Sprintf("%s: %s", chunk.SectionTitle, chunk.ArticleTitle),
-		Content:   chunk.Text,
-		URL:       chunk.SourceURL,
-		Server:    chunk.Server,
+		Id:            id,
+		Dense:         resp.Embeddings[0],
+		SparseVal:     sparseVal,
+		SparseIdx:     sparseIdx,
+		Title:         fmt.Sprintf("%s: %s", chunk.SectionTitle, chunk.ArticleTitle),
+		Content:       chunk.Text,
+		URL:           chunk.SourceURL,
+		Server:        chunk.Server,
+		ArticleNumber: ExtractArticleNumber(chunk.SectionTitle),
+		ArticleTitle:  chunk.ArticleTitle,
+		ChapterNumber: ExtractChapterNumber(chunk.SectionTitle),
 	}
 	return point
 }
