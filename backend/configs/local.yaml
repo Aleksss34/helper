@@ -23,3 +23,4 @@ qdrant:
 
 parser:
   browser-path: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+  commands-path: "./data/commands.txt"

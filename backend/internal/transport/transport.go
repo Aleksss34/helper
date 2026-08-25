@@ -11,6 +11,8 @@ type SearcherService interface {
 type ParserService interface {
 	ParseWiki(ctx context.Context) error
 	ParseLegislation(ctx context.Context) error
+	ParseRules(ctx context.Context) error
+	ParseCommands(ctx context.Context) error
 }
 type Parser struct {
 	log  *slog.Logger

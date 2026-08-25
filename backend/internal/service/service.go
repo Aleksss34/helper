@@ -29,6 +29,7 @@ type Parser struct {
 	vocab        *bm25.Vocabulary
 	avgDL        *bm25.AvgDocLength
 	qdrant       Qdrant
+	commandsPath string
 }
 
 type Searcher struct {
@@ -43,9 +44,9 @@ type Service struct {
 	Searcher *Searcher
 }
 
-func NewParser(log *slog.Logger, httpClient *http.Client, ollamaClient *api.Client, browserPath string, qdrant Qdrant, batchSize int, vocab *bm25.Vocabulary, avgDL *bm25.AvgDocLength) *Parser {
+func NewParser(log *slog.Logger, httpClient *http.Client, ollamaClient *api.Client, browserPath string, qdrant Qdrant, batchSize int, vocab *bm25.Vocabulary, avgDL *bm25.AvgDocLength, commandsPath string) *Parser {
 
-	return &Parser{log: log, httpClient: httpClient, ollamaClient: ollamaClient, browserPath: browserPath, qdrant: qdrant, batchSize: batchSize, vocab: vocab, avgDL: avgDL}
+	return &Parser{log: log, httpClient: httpClient, ollamaClient: ollamaClient, browserPath: browserPath, qdrant: qdrant, batchSize: batchSize, vocab: vocab, avgDL: avgDL, commandsPath: commandsPath}
 }
 func NewSearcher(log *slog.Logger, qdrant Qdrant, ollamaClient *api.Client, openaiClient *openai.Client, vocab *bm25.Vocabulary) *Searcher {
 

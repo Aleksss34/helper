@@ -49,7 +49,7 @@ func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, ga
 	if err != nil {
 		panic(err)
 	}
-	parserService := service.NewParser(log, httpClient, ollamaClient, parserCfg.BrowserPath, qdr, qdrantCfg.BatchSize, vocab, avgDL)
+	parserService := service.NewParser(log, httpClient, ollamaClient, parserCfg.BrowserPath, qdr, qdrantCfg.BatchSize, vocab, avgDL, parserCfg.CommandsPath)
 	searcherService := service.NewSearcher(log, qdr, ollamaClient, clientOpenAi, vocab)
 	serv := service.NewService(parserService, searcherService)
 

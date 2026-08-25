@@ -30,7 +30,8 @@ type QdrantConfig struct {
 }
 
 type ParserConfig struct {
-	BrowserPath string `yaml:"browser-path"`
+	BrowserPath  string `yaml:"browser-path"`
+	CommandsPath string `yaml:"commands-path"`
 }
 
 type Config struct {

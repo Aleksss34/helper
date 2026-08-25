@@ -9,7 +9,7 @@ export const ParseLegistationButton: React.FC = () => {
         setResult(null);
 
         try {
-            const response = await fetch('http://localhost:8080/parse-legislation', {
+            const response = await fetch('http://127.0.0.1:8080/parse-legislation', {
                 method: 'GET',
             });
 
