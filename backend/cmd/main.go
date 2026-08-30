@@ -25,7 +25,7 @@ func main() {
 
 	cfg := config.MustLoad()
 	log := setupLogger(cfg.Env)
-	params := domain.PostgresParams{
+	paramsPostgres := domain.PostgresParams{
 		Host:     cfg.Postgres.Host,
 		Port:     cfg.Postgres.Port,
 		User:     cfg.Postgres.User,
@@ -33,7 +33,8 @@ func main() {
 		Password: cfg.Postgres.Password,
 		Sslmode:  cfg.Postgres.Sslmode,
 	}
-	application := app.New(ctx, log, params, cfg.Gateway, cfg.Parser, cfg.Qdrant, cfg.ApiKeyGroq, cfg.TimeoutServer)
+	paramsRedis := domain.RedisParams{Host: cfg.Redis.Host, Port: cfg.Redis.Port, Password: cfg.Redis.Password}
+	application := app.New(ctx, log, paramsPostgres, paramsRedis, cfg.Gateway, cfg.Parser, cfg.Qdrant, cfg.ApiKeyGroq, cfg.TimeoutServer, cfg.Redis.Timeout, cfg.HmacSecret, cfg.CostHasher)
 	go func() {
 		application.Server.MustRun()
 	}()

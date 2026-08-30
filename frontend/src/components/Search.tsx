@@ -1,4 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Header } from './Header';
+import { UserStatusWidget } from "./widget.tsx";
+import { useAuth } from "./AuthModal.tsx";
+import { useUser } from "./GetUser.tsx";
 
 const SERVERS = [
     'RED', 'YELLOW', 'GREEN', 'AZURE', 'SILVER', 'ROSE',
@@ -16,7 +20,28 @@ export const SearchStream: React.FC = () => {
     const [question, setQuestion] = useState('');
     const [selectedServer, setSelectedServer] = useState(SERVERS[0]);
     const [messages, setMessages] = useState<Message[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+
+    const { accessToken, isLoading: isAuthLoading } = useAuth();
+    const { user, refetch: refetchUser } = useUser();
+
+    // Не авторизован — либо ещё грузится сессия, либо точно нет токена
+    const isUnauthenticated = !isAuthLoading && !accessToken;
+
+    const questionsLeft = user?.count_questions ?? 0;
+    const isLimitReached = user?.status === 'base' && questionsLeft <= 0;
+
+    // Флаги блокировки элементов ввода
+    const isInputDisabled = isSending || isLimitReached || isUnauthenticated || isAuthLoading;
+    const isSubmitDisabled = isSending || isAuthLoading || !accessToken || !question.trim() || !selectedServer || isLimitReached;
+
+    const placeholderText = isUnauthenticated
+        ? "Авторизуйтесь, чтобы задать вопрос"
+        : isLimitReached
+            ? "Лимит запросов исчерпан. Оформите VIP подписку."
+            : "Спросите что-нибудь...";
+
+    const isBlocked = isLimitReached || isUnauthenticated;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -30,12 +55,18 @@ export const SearchStream: React.FC = () => {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!question.trim() || !selectedServer || isLoading) return;
+
+        if (isSubmitDisabled) return;
+
+        if (!accessToken) {
+            console.error('Нет access token — пользователь не авторизован');
+            return;
+        }
 
         const userText = question.trim();
         const currentServer = selectedServer;
         setQuestion('');
-        setIsLoading(true);
+        setIsSending(true);
 
         const userMsgId = Date.now().toString();
         const aiMsgId = (Date.now() + 1).toString();
@@ -47,9 +78,13 @@ export const SearchStream: React.FC = () => {
         ]);
 
         try {
-            const response = await fetch('http://localhost:8080/search', {
+            const response = await fetch('http://localhost:8080/api/search', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                credentials: 'include',
                 body: JSON.stringify({
                     question: userText,
                     server: currentServer
@@ -83,6 +118,9 @@ export const SearchStream: React.FC = () => {
                     }
                 }
             }
+
+            refetchUser?.();
+
         } catch (error) {
             console.error('Ошибка потока:', error);
             setMessages((prev) =>
@@ -93,37 +131,21 @@ export const SearchStream: React.FC = () => {
                 )
             );
         } finally {
-            setIsLoading(false);
+            setIsSending(false);
         }
     };
-
-    const isSubmitDisabled = isLoading || !question.trim() || !selectedServer;
 
     return (
         <div style={{
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',
-            backgroundColor: '#090d16', // Глубокий тёмно-синий/углистый фон
+            backgroundColor: '#090d16',
             color: '#f3f4f6',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
-            {/* Шапка */}
-            <header style={{
-                padding: '16px 24px',
-                borderBottom: '1px solid #1f293d',
-                backgroundColor: '#0f172a',
-                textAlign: 'center',
-                fontWeight: '600',
-                fontSize: '18px',
-                letterSpacing: '0.5px',
-                color: '#e2e8f0',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
-            }}>
-                <span style={{ color: '#6366f1' }}>AMAZING</span> AI Helper
-            </header>
+            <Header />
 
-            {/* Область сообщений */}
             <div style={{
                 flex: 1,
                 overflowY: 'auto',
@@ -145,7 +167,6 @@ export const SearchStream: React.FC = () => {
                         }}>
                             <div style={{ fontSize: '32px' }}>✨</div>
                             <div style={{ fontSize: '18px', fontWeight: '500' }}>Готов, когда ты готов...</div>
-
                         </div>
                     )}
 
@@ -158,7 +179,6 @@ export const SearchStream: React.FC = () => {
                                 alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start',
                             }}
                         >
-                            {/* Тэг сервера */}
                             {msg.sender === 'user' && (
                                 <span style={{
                                     fontSize: '11px',
@@ -173,13 +193,11 @@ export const SearchStream: React.FC = () => {
                                 </span>
                             )}
 
-                            {/* Баббл сообщения */}
                             <div
                                 style={{
                                     maxWidth: '85%',
                                     padding: '14px 18px',
                                     borderRadius: '20px',
-                                    // Фиолетово-синий градиент для пользователя, тёмный графитовый для ИИ
                                     background: msg.sender === 'user'
                                         ? 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)'
                                         : '#1e293b',
@@ -195,7 +213,7 @@ export const SearchStream: React.FC = () => {
                                     borderBottomLeftRadius: msg.sender === 'ai' ? '4px' : '20px',
                                 }}
                             >
-                                {msg.text || (isLoading && msg.sender === 'ai' ? (
+                                {msg.text || (isSending && msg.sender === 'ai' ? (
                                     <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Идет генерация ответа...</span>
                                 ) : '')}
                             </div>
@@ -205,7 +223,8 @@ export const SearchStream: React.FC = () => {
                 </div>
             </div>
 
-            {/* Нижняя панель с кастомным закругленным инпутом */}
+            <UserStatusWidget />
+
             <div style={{
                 padding: '20px',
                 backgroundColor: '#090d16',
@@ -220,19 +239,19 @@ export const SearchStream: React.FC = () => {
                         gap: '10px',
                         width: '100%',
                         maxWidth: '768px',
-                        backgroundColor: '#1e293b',
+                        backgroundColor: isBlocked ? '#111827' : '#1e293b',
                         padding: '8px 8px 8px 16px',
-                        borderRadius: '28px', // Максимально круглое закругление
-                        border: '1px solid #334155',
+                        borderRadius: '28px',
+                        border: isBlocked ? '1px solid #7f1d1d' : '1px solid #334155',
                         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
-                        transition: 'all 0.2s ease-in-out'
+                        transition: 'all 0.2s ease-in-out',
+                        opacity: isBlocked ? 0.75 : 1,
                     }}
                 >
-                    {/* Выпадающий список серверов */}
                     <select
                         value={selectedServer}
                         onChange={(e) => setSelectedServer(e.target.value)}
-                        disabled={isLoading}
+                        disabled={isInputDisabled}
                         style={{
                             padding: '8px 12px',
                             fontSize: '13px',
@@ -240,8 +259,8 @@ export const SearchStream: React.FC = () => {
                             borderRadius: '18px',
                             border: '1px solid #475569',
                             backgroundColor: '#0f172a',
-                            color: '#cbd5e1',
-                            cursor: 'pointer',
+                            color: isBlocked ? '#64748b' : '#cbd5e1',
+                            cursor: isInputDisabled ? 'not-allowed' : 'pointer',
                             outline: 'none',
                         }}
                     >
@@ -252,32 +271,31 @@ export const SearchStream: React.FC = () => {
                         ))}
                     </select>
 
-                    {/* Поле ввода вопроса */}
                     <input
                         type="text"
                         value={question}
                         onChange={(e) => setQuestion(e.target.value)}
-                        placeholder="Спросите что-нибудь..."
-                        disabled={isLoading}
+                        placeholder={placeholderText}
+                        disabled={isInputDisabled}
                         style={{
                             flex: 1,
                             padding: '8px 4px',
                             fontSize: '15px',
                             border: 'none',
                             backgroundColor: 'transparent',
-                            color: '#f8fafc',
+                            color: isBlocked ? '#94a3b8' : '#f8fafc',
+                            cursor: isInputDisabled ? 'not-allowed' : 'text',
                             outline: 'none'
                         }}
                     />
 
-                    {/* Круглая кнопка отправки */}
                     <button
                         type="submit"
                         disabled={isSubmitDisabled}
                         style={{
                             width: '40px',
                             height: '40px',
-                            borderRadius: '50%', // Идеально круглая кнопка
+                            borderRadius: '50%',
                             border: 'none',
                             background: isSubmitDisabled
                                 ? '#334155'

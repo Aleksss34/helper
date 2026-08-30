@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 	"github.com/chromedp/chromedp"
 )
 
@@ -50,7 +50,7 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 	//}
 	//defer out.Close()
 
-	points := make([]*dto.Point, 0, p.batchSize)
+	points := make([]*domain.Point, 0, p.batchSize)
 	var id uint64 = 0
 
 	for i, idPage := range idPages {
@@ -74,7 +74,7 @@ func (p *Parser) ParseLegislation(ctx context.Context) error {
 			title = strings.TrimSpace(title)
 
 			for _, content := range contents {
-				article := dto.Article{Title: title, Content: content, URL: t.URL, Server: serverName}
+				article := domain.Article{Title: title, Content: content, URL: t.URL, Server: serverName}
 				chunks := p.chunkLegislationArticle(article)
 
 				for _, chunk := range chunks {

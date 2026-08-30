@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 	targeted_search "github.com/Aleksss34/helper/backend/internal/service/targeted-search"
 	"github.com/Aleksss34/helper/backend/pkg/bm25"
 	"github.com/ollama/ollama/api"
@@ -20,6 +20,15 @@ import (
 func (s *Searcher) Search(ctx context.Context, question string, server string, out chan<- string) error {
 	var op = "service.searcher.Search"
 	log := s.log.With(slog.String("op", op))
+	userId := ctx.Value("userID").(int64)
+	ok, err := s.checkLimit(ctx, userId)
+	if err != nil {
+		return fmt.Errorf("%s:%w", op, err)
+	}
+	if !ok {
+		log.Info("У пользователя закончились лимиты, он может приобрести VIP")
+		return fmt.Errorf("%s:%w", op, domain.ErrLimitReached)
+	}
 
 	points, err := s.retrievePoints(ctx, question, server, log)
 	if err != nil {
@@ -94,12 +103,38 @@ func (s *Searcher) Search(ctx context.Context, question string, server string, o
 		}
 	}
 }
+
+func (s *Searcher) checkLimit(ctx context.Context, userId int64) (bool, error) {
+
+	var op = "service.Searcher.checkLimit"
+	log := s.log.With(slog.String("op", op))
+	user, err := s.postgres.GetUserByID(ctx, userId)
+	if err != nil {
+		log.Error("Не удалось найти пользователя по айди", slog.Any("error", err))
+		return false, fmt.Errorf("%s:%w", op, err)
+	}
+	status := user.Status
+	if status == "admin" || status == "VIP" {
+		return true, nil
+	}
+	countQuestions := user.CountQuestions
+	if countQuestions > 0 {
+
+		err = s.postgres.SetCountQuestions(ctx, userId, -1)
+		if err != nil {
+			log.Error("Не удалось изменить количество оставшихся вопросов")
+			return false, fmt.Errorf("%s:%w", op, err)
+		}
+		return true, nil
+	}
+	return false, nil
+}
 func (s *Searcher) retrievePoints(
 	ctx context.Context,
 	question string,
 	server string,
 	log *slog.Logger,
-) ([]*dto.Point, error) {
+) ([]*domain.Point, error) {
 
 	lawName := targeted_search.DetectLawName(question)
 
@@ -222,7 +257,7 @@ func (s *Searcher) retrievePoints(
 	return s.hybridSearch(ctx, question, server, log)
 }
 
-func (s *Searcher) hybridSearch(ctx context.Context, question, server string, log *slog.Logger) ([]*dto.Point, error) {
+func (s *Searcher) hybridSearch(ctx context.Context, question, server string, log *slog.Logger) ([]*domain.Point, error) {
 	req := &api.EmbedRequest{
 		Model: "bge-m3",
 		Input: question,

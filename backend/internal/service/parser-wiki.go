@@ -8,8 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
-
+	"github.com/Aleksss34/helper/backend/internal/domain"
 	"github.com/chromedp/chromedp"
 )
 
@@ -53,12 +52,12 @@ func (p *Parser) ParseWiki(ctx context.Context) error {
 		return fmt.Errorf("%s:Список статей пуст", op)
 	}
 
-	points := make([]*dto.Point, 0, p.batchSize)
+	points := make([]*domain.Point, 0, p.batchSize)
 
 	// 5. Идём по всем URL
 	var id uint64
 	id = 0
-	var article dto.Article
+	var article domain.Article
 	for i, page := range pages {
 		title, content, err := p.scrapeArticle(chromedbCtx, page.URL)
 		if err != nil {
@@ -68,7 +67,7 @@ func (p *Parser) ParseWiki(ctx context.Context) error {
 		if title == "" {
 			title = page.Title
 		}
-		article = dto.Article{Title: title, Content: content, URL: page.URL, Server: server}
+		article = domain.Article{Title: title, Content: content, URL: page.URL, Server: server}
 		chunks := p.chunkWikiArticle(article)
 		for _, chunk := range chunks {
 			id++

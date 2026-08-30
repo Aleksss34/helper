@@ -19,11 +19,12 @@ type App struct {
 	Port   string
 }
 
-func New(log *slog.Logger, serv *service.Service, host, port string, timeout int64) *App {
+func New(log *slog.Logger, serv *service.Service, host, port string, timeout int64, hmacSecret string) *App {
 	timeoutServer := time.Duration(timeout) * time.Second
 	parser := transport.NewParser(log, serv.Parser)
 	searcher := transport.NewSearcher(log, serv.Searcher)
-	trans := transport.NewTransport(parser, searcher)
+	auth := transport.NewAuth(log, serv.Auth, hmacSecret)
+	trans := transport.NewTransport(parser, searcher, auth)
 	router := trans.InitRouter()
 	router.Use(trans.CorsMiddleware)
 	addr := fmt.Sprintf("%s:%s", host, port)

@@ -20,6 +20,12 @@ type PostgresConfig struct {
 	Password string `yaml:"password"`
 	Sslmode  string `yaml:"sslmode"`
 }
+type RedisConfig struct {
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Password string `yaml:"password"`
+	Timeout  int64  `yaml:"timeout"`
+}
 type QdrantConfig struct {
 	Host           string  `yaml:"host"`
 	Port           int     `yaml:"port"`
@@ -40,9 +46,12 @@ type Config struct {
 	TimeoutServer int64          `yaml:"timeout-server"`
 	Gateway       GatewayConfig  `yaml:"gateway"`
 	Postgres      PostgresConfig `yaml:"postgres"`
+	Redis         RedisConfig    `yaml:"redis"`
 	Parser        ParserConfig   `yaml:"parser"`
 	Qdrant        QdrantConfig   `yaml:"qdrant"`
 	ApiKeyGroq    string         `env:"KEY_GROQ"`
+	CostHasher    int            `yaml:"cost-hasher"`
+	HmacSecret    string         `yaml:"hmacsecret"`
 }
 
 func MustLoad() *Config {

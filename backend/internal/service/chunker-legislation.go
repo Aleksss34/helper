@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 )
 
 var reDate = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}|\d{2}\.\d{4}|\d{2}\.\d{2}\.\d{4})`)
@@ -19,8 +19,8 @@ var reClause = regexp.MustCompile(`^\d+\.\d+\.?\s+\S`)
 var reTableBlockStart = regexp.MustCompile(`^\[TABLE_BLOCK\]`)
 var reTableBlockEnd = regexp.MustCompile(`^\[/TABLE_BLOCK\]`)
 
-func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
-	var chunks []dto.Chunk
+func (p *Parser) chunkLegislationArticle(a domain.Article) []domain.Chunk {
+	var chunks []domain.Chunk
 	scanner := bufio.NewScanner(strings.NewReader(a.Content))
 
 	var lines []string
@@ -57,7 +57,7 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 				partTitle = fmt.Sprintf("%s (Часть %d/%d)", sectionTitle, idx+1, len(textParts))
 			}
 
-			chunks = append(chunks, dto.Chunk{
+			chunks = append(chunks, domain.Chunk{
 				Server:       a.Server,
 				ArticleTitle: a.Title,
 				SectionTitle: partTitle,
@@ -88,7 +88,7 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 		if dateMatch := reDate.FindString(line); dateMatch != "" {
 			flushDefault()
 			sectionTitle, text, newI := p.chunkChanges(dateMatch, i, lines)
-			chunks = append(chunks, dto.Chunk{
+			chunks = append(chunks, domain.Chunk{
 				Server:       a.Server,
 				ArticleTitle: a.Title,
 				SectionTitle: sectionTitle,
@@ -113,7 +113,7 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 					partTitle = fmt.Sprintf("%s (Часть %d/%d)", sectionTitle, idx+1, len(textParts))
 				}
 
-				chunks = append(chunks, dto.Chunk{
+				chunks = append(chunks, domain.Chunk{
 					Server:       a.Server,
 					ArticleTitle: a.Title,
 					SectionTitle: partTitle,
@@ -140,7 +140,7 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 					partTitle = fmt.Sprintf("%s (Часть %d/%d)", sectionTitle, idx+1, len(textParts))
 				}
 
-				chunks = append(chunks, dto.Chunk{
+				chunks = append(chunks, domain.Chunk{
 					Server:       a.Server,
 					ArticleTitle: a.Title,
 					SectionTitle: partTitle,
@@ -186,7 +186,7 @@ func (p *Parser) chunkLegislationArticle(a dto.Article) []dto.Chunk {
 						partTitle = fmt.Sprintf("%s (Часть %d/%d)", sectionTitle, idx+1, len(textParts))
 					}
 
-					chunks = append(chunks, dto.Chunk{
+					chunks = append(chunks, domain.Chunk{
 						Server:       a.Server,
 						ArticleTitle: a.Title,
 						SectionTitle: partTitle,

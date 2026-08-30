@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 )
 
-func (p *Parser) chunkRulesBlocks(pageTitle, url string, blocks []RuleBlock) []dto.Chunk {
-	var chunks []dto.Chunk
+func (p *Parser) chunkRulesBlocks(pageTitle, url string, blocks []RuleBlock) []domain.Chunk {
+	var chunks []domain.Chunk
 
 	for _, block := range blocks {
 		switch block.Type {
@@ -45,7 +45,7 @@ func (p *Parser) chunkRulesBlocks(pageTitle, url string, blocks []RuleBlock) []d
 					continue
 				}
 
-				chunks = append(chunks, dto.Chunk{
+				chunks = append(chunks, domain.Chunk{
 					ArticleTitle: pageTitle,
 					SectionTitle: block.Label,
 					SourceURL:    url,
@@ -77,7 +77,7 @@ func (p *Parser) chunkRulesBlocks(pageTitle, url string, blocks []RuleBlock) []d
 				b.WriteString("\n")
 				b.WriteString(part)
 
-				chunks = append(chunks, dto.Chunk{
+				chunks = append(chunks, domain.Chunk{
 					ArticleTitle: pageTitle,
 					SectionTitle: sectionTitle,
 					SourceURL:    url,

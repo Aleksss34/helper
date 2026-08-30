@@ -15,6 +15,7 @@ require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f // indirect
 	github.com/chromedp/chromedp v0.16.0 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
@@ -32,8 +33,10 @@ require (
 	github.com/lmittmann/tint v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/qdrant/go-client v1.19.0 // indirect
+	github.com/redis/go-redis/v9 v9.22.0 // indirect
 	github.com/sashabaranov/go-openai v1.42.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect

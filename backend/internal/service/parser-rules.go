@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 	"github.com/chromedp/chromedp"
 )
 
@@ -84,7 +84,7 @@ func (p *Parser) ParseRules(ctx context.Context) error {
 	chromedbCtx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
 
-	points := make([]*dto.Point, 0, p.batchSize)
+	points := make([]*domain.Point, 0, p.batchSize)
 	var id uint64 = 0
 
 	for _, slug := range rulePages {

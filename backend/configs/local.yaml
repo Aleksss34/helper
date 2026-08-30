@@ -1,6 +1,8 @@
 env: local
 
 timeout-server: 100
+cost-hasher: 12
+hmacsecret: "vladimir"
 gateway:
   host: "localhost"
   port: 8080
@@ -12,7 +14,11 @@ postgres:
   db_name: "history"
   password: "12345678"
   sslmode: "disable"
-
+redis:
+  host: "localhost"
+  port: 6379
+  password: "12345678"
+  timeout: 720
 qdrant:
   host: "localhost"
   port: 6334

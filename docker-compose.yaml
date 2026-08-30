@@ -11,7 +11,7 @@ services:
       - POSTGRES_DB=${DB_POSTGRES_NAME}
       - POSTGRES_PASSWORD=${DB_POSTGRES_PASSWORD}
     volumes:
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./backend/init-scripts:/docker-entrypoint-initdb.d
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant_db
@@ -21,27 +21,32 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     restart: always
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
+#  ollama:
+#    image: ollama/ollama:latest
+#    container_name: ollama
+#    ports:
+#      - "11434:11434"
+#    volumes:
+#      - ollama_data:/root/.ollama
+#    restart: unless-stopped
+#
+#
+#  ollama-init:
+#    image: curlimages/curl:latest
+#    container_name: ollama_init
+#    depends_on:
+#      - ollama
+#
+#    entrypoint: >
+#      sh -c "sleep 3 &&
+#      curl -s http://ollama:11434/api/pull -d '{\"name\": \"bge-m3\"}' &&
+#      curl -s http://ollama:11434/api/pull -d '{\"name\": \"qwen2.5:3b\"}'"
+  redis:
+    image: redis
+    container_name: app_redis
     ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-
-
-  ollama-init:
-    image: curlimages/curl:latest
-    container_name: ollama_init
-    depends_on:
-      - ollama
-
-    entrypoint: >
-      sh -c "sleep 3 && 
-      curl -s http://ollama:11434/api/pull -d '{\"name\": \"bge-m3\"}' && 
-      curl -s http://ollama:11434/api/pull -d '{\"name\": \"qwen2.5:3b\"}'"
-
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASS}
 
 volumes:
   qdrant_data:

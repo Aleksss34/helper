@@ -7,12 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
-
+	"github.com/Aleksss34/helper/backend/internal/domain"
 	"github.com/qdrant/go-client/qdrant"
 )
 
-func (q *Qdrant) Upsert(ctx context.Context, points []*dto.Point) error {
+func (q *Qdrant) Upsert(ctx context.Context, points []*domain.Point) error {
 	var op = "storage.qdrant.Upsert"
 	qdrantPoints := make([]*qdrant.PointStruct, 0, len(points))
 
@@ -69,7 +68,7 @@ func (q *Qdrant) EnsureExactFilterIndexes(ctx context.Context) error {
 	}
 	return nil
 }
-func (q *Qdrant) ExactSearch(ctx context.Context, articleNumber, articleTitle, server string) ([]*dto.Point, error) {
+func (q *Qdrant) ExactSearch(ctx context.Context, articleNumber, articleTitle, server string) ([]*domain.Point, error) {
 	var op = "storage.qdrant.ExactSearch"
 
 	if articleNumber == "" {
@@ -96,9 +95,9 @@ func (q *Qdrant) ExactSearch(ctx context.Context, articleNumber, articleTitle, s
 		return nil, fmt.Errorf("%s:%w", op, err)
 	}
 
-	var points []*dto.Point
+	var points []*domain.Point
 	for _, p := range result {
-		points = append(points, &dto.Point{
+		points = append(points, &domain.Point{
 			Id:            p.Id.GetNum(),
 			Title:         p.Payload["title"].GetStringValue(),
 			Content:       p.Payload["content"].GetStringValue(),
@@ -120,7 +119,7 @@ func (q *Qdrant) SearchByChapter(
 	chapterNumber string,
 	lawName string,
 	server string,
-) ([]*dto.Point, error) {
+) ([]*domain.Point, error) {
 
 	must := []*qdrant.Condition{
 		qdrant.NewMatch("chapter_number", chapterNumber),
@@ -147,9 +146,9 @@ func (q *Qdrant) SearchByChapter(
 		return nil, fmt.Errorf("scroll по главе %s: %w", chapterNumber, err)
 	}
 
-	points := make([]*dto.Point, 0, len(res))
+	points := make([]*domain.Point, 0, len(res))
 	for _, p := range res {
-		points = append(points, &dto.Point{
+		points = append(points, &domain.Point{
 			Id:            p.Id.GetNum(),
 			Title:         p.Payload["title"].GetStringValue(),
 			Content:       p.Payload["content"].GetStringValue(),
@@ -192,11 +191,11 @@ func articleNumberLess(a, b string) bool {
 
 	return aSub < bSub
 }
-func (q *Qdrant) Get(ctx context.Context, dense, sparseVal []float32, sparseIdx []uint32, server string) ([]*dto.Point, error) {
+func (q *Qdrant) Get(ctx context.Context, dense, sparseVal []float32, sparseIdx []uint32, server string) ([]*domain.Point, error) {
 
 	var op = "storage.qdrant.Get"
-	var resp []*dto.Point
-	var point *dto.Point
+	var resp []*domain.Point
+	var point *domain.Point
 
 	scoredPoints, err := q.db.Query(ctx, &qdrant.QueryPoints{
 		CollectionName: q.collectionName,
@@ -231,7 +230,7 @@ func (q *Qdrant) Get(ctx context.Context, dense, sparseVal []float32, sparseIdx 
 		title := p.Payload["title"].GetStringValue()
 		content := p.Payload["content"].GetStringValue()
 		serv := p.Payload["server"].GetStringValue()
-		point = &dto.Point{Id: p.Id.GetNum(), URL: url, Title: title, Content: content, Server: serv}
+		point = &domain.Point{Id: p.Id.GetNum(), URL: url, Title: title, Content: content, Server: serv}
 		resp = append(resp, point)
 	}
 
@@ -245,7 +244,7 @@ func (q *Qdrant) Get(ctx context.Context, dense, sparseVal []float32, sparseIdx 
 //	sparseVal []float32,
 //	sparseIdx []uint32,
 //	server string,
-//) ([]*dto.Point, error) {
+//) ([]*domain.Point, error) {
 //
 //	filter := &qdrant.Filter{
 //		Must: []*qdrant.Condition{
@@ -311,7 +310,7 @@ func (q *Qdrant) SearchSubArticles(
 	articleNumber string,
 	lawName string,
 	server string,
-) ([]*dto.Point, error) {
+) ([]*domain.Point, error) {
 
 	var op = "storage.qdrant.SearchSubArticles"
 
@@ -320,7 +319,7 @@ func (q *Qdrant) SearchSubArticles(
 		qdrant.NewMatchKeywords("server", server, "all"),
 	}
 
-	var result []*dto.Point
+	var result []*domain.Point
 
 	// Для запроса статьи "9" ищем "9.1", "9.2", "9.3"...
 	prefix := articleNumber + "."
@@ -349,7 +348,7 @@ func (q *Qdrant) SearchSubArticles(
 			continue
 		}
 
-		result = append(result, &dto.Point{
+		result = append(result, &domain.Point{
 			Id:            p.Id.GetNum(),
 			URL:           p.Payload["URL"].GetStringValue(),
 			Title:         p.Payload["title"].GetStringValue(),

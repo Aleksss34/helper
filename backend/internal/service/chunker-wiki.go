@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 )
 
 // Порог для обычных статей без чёткой структуры разделов
@@ -23,12 +23,12 @@ var tocLineRe = regexp.MustCompile(`^(\d+(?:\.\d+)*)[\t ]+(.+)$`)
 // характерная для разделов-перечислений (профессии, предметы, локации и т.п.)
 var listItemPattern = regexp.MustCompile(`^([А-ЯA-Z][а-яa-zА-ЯA-Z0-9\s]{1,40}?)\s*[-—]\s*(.+)$`)
 
-func (p *Parser) chunkWikiArticle(a dto.Article) []dto.Chunk {
+func (p *Parser) chunkWikiArticle(a domain.Article) []domain.Chunk {
 	wordCount := len(strings.Fields(a.Content))
 
 	// Короткая статья — не режем
 	if wordCount <= shortArticleWordThreshold {
-		return []dto.Chunk{{
+		return []domain.Chunk{{
 			ArticleTitle: a.Title,
 			SourceURL:    a.URL,
 			Text:         fmt.Sprintf("%s. %s", a.Title, a.Content),
@@ -45,7 +45,7 @@ func (p *Parser) chunkWikiArticle(a dto.Article) []dto.Chunk {
 		return p.chunkByParagraphs(a)
 	}
 
-	var chunks []dto.Chunk
+	var chunks []domain.Chunk
 	for _, sec := range sections {
 		// если раздел похож на список однотипных пунктов
 		// ("Профессия - описание", "Предмет - характеристики") — режем
@@ -59,7 +59,7 @@ func (p *Parser) chunkWikiArticle(a dto.Article) []dto.Chunk {
 		}
 
 		text := fmt.Sprintf("%s. %s: %s", a.Title, sec.Heading, sec.Content)
-		chunks = append(chunks, dto.Chunk{
+		chunks = append(chunks, domain.Chunk{
 			ArticleTitle: a.Title,
 			SectionTitle: sec.Heading,
 			SourceURL:    a.URL,
@@ -104,10 +104,10 @@ func (p *Parser) isListLikeSection(content string) bool {
 // chunkListSection режет списочный раздел по отдельным пунктам — каждая
 // строка вида "Название - текст" становится своим чанком с указанием,
 // к какой статье/разделу/сущности он относится.
-func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url, server string) []dto.Chunk {
+func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url, server string) []domain.Chunk {
 	lines := strings.Split(content, "\n")
 
-	var chunks []dto.Chunk
+	var chunks []domain.Chunk
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -118,7 +118,7 @@ func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url, se
 			// Строка не подошла под паттерн (например, вводная фраза перед
 			// списком) — прикрепляем её как отдельный чанк-контекст, чтобы
 			// не потерять, но не пытаемся разбивать дальше
-			chunks = append(chunks, dto.Chunk{
+			chunks = append(chunks, domain.Chunk{
 				ArticleTitle: articleTitle,
 				SectionTitle: sectionHeading,
 				SourceURL:    url,
@@ -132,7 +132,7 @@ func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url, se
 		description := strings.TrimSpace(m[2])
 
 		text := fmt.Sprintf("%s. %s. %s: %s", articleTitle, sectionHeading, entityName, description)
-		chunks = append(chunks, dto.Chunk{
+		chunks = append(chunks, domain.Chunk{
 			ArticleTitle: articleTitle,
 			SectionTitle: sectionHeading + " — " + entityName,
 			SourceURL:    url,
@@ -144,7 +144,7 @@ func (p *Parser) chunkListSection(articleTitle, sectionHeading, content, url, se
 	if len(chunks) == 0 {
 		// Подстраховка: если почему-то ничего не наскреблось (весь раздел
 		// оказался пустыми строками) — вернуть раздел целиком одним чанком
-		return []dto.Chunk{{
+		return []domain.Chunk{{
 			ArticleTitle: articleTitle,
 			SectionTitle: sectionHeading,
 			SourceURL:    url,
@@ -275,10 +275,10 @@ func (p *Parser) splitBodyByHeadings(body string, headings []string) []section {
 // chunkByParagraphs — запасной вариант для длинных статей без чёткой
 // структуры разделов: режем просто по абзацам (двойной перенос строки),
 // собирая их в чанки примерно по shortArticleWordThreshold слов.
-func (p *Parser) chunkByParagraphs(a dto.Article) []dto.Chunk {
+func (p *Parser) chunkByParagraphs(a domain.Article) []domain.Chunk {
 	paragraphs := strings.Split(a.Content, "\n\n")
 
-	var chunks []dto.Chunk
+	var chunks []domain.Chunk
 	var buf strings.Builder
 	wordCount := 0
 
@@ -287,7 +287,7 @@ func (p *Parser) chunkByParagraphs(a dto.Article) []dto.Chunk {
 		if text == "" {
 			return
 		}
-		chunks = append(chunks, dto.Chunk{
+		chunks = append(chunks, domain.Chunk{
 			ArticleTitle: a.Title,
 			SourceURL:    a.URL,
 			Text:         fmt.Sprintf("%s. %s", a.Title, text),
@@ -314,7 +314,7 @@ func (p *Parser) chunkByParagraphs(a dto.Article) []dto.Chunk {
 
 	if len(chunks) == 0 {
 		// Статья вообще без абзацев — отдаём как есть одним чанком
-		chunks = append(chunks, dto.Chunk{
+		chunks = append(chunks, domain.Chunk{
 			ArticleTitle: a.Title,
 			SourceURL:    a.URL,
 			Text:         fmt.Sprintf("%s. %s", a.Title, a.Content),

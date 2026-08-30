@@ -4,13 +4,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 )
 
-func (p *Parser) chunkCommandsText(rawText string, source string) []dto.Chunk {
+func (p *Parser) chunkCommandsText(rawText string, source string) []domain.Chunk {
 	lines := strings.Split(rawText, "\n")
 
-	var chunks []dto.Chunk
+	var chunks []domain.Chunk
 	var currentCategory string
 
 	for _, line := range lines {
@@ -46,7 +46,7 @@ func (p *Parser) chunkCommandsText(rawText string, source string) []dto.Chunk {
 			b.WriteString("\nОписание: ")
 			b.WriteString(desc)
 
-			chunks = append(chunks, dto.Chunk{
+			chunks = append(chunks, domain.Chunk{
 				ArticleTitle: currentCategory,
 				SectionTitle: cmd,
 				SourceURL:    source,

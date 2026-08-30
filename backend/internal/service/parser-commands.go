@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/Aleksss34/helper/backend/internal/dto"
+	"github.com/Aleksss34/helper/backend/internal/domain"
 )
 
 var (
@@ -29,7 +29,7 @@ func (p *Parser) ParseCommands(ctx context.Context) error {
 	rawText := string(data)
 	chunks := p.chunkCommandsText(rawText, p.commandsPath)
 
-	points := make([]*dto.Point, 0, len(chunks))
+	points := make([]*domain.Point, 0, len(chunks))
 	for id, chunk := range chunks {
 		log.Info("Чанк успешно запаршен", slog.Int("Номер", id+1))
 		pointId := p.hashToUint64(chunk.SourceURL + "#" + strconv.Itoa(int(id)))

@@ -11,7 +11,11 @@ import (
 	"github.com/Aleksss34/helper/backend/internal/domain"
 	"github.com/Aleksss34/helper/backend/internal/service"
 	"github.com/Aleksss34/helper/backend/internal/storage"
+	"github.com/Aleksss34/helper/backend/internal/storage/postgres"
+	"github.com/Aleksss34/helper/backend/internal/storage/redis"
 	"github.com/Aleksss34/helper/backend/pkg/bm25"
+	hash "github.com/Aleksss34/helper/backend/pkg/hasher"
+
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/ollama/ollama/api"
@@ -22,16 +26,19 @@ type App struct {
 	Server *restapp.App
 }
 
-func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, gatewayCfg config.GatewayConfig, parserCfg config.ParserConfig, qdrantCfg config.QdrantConfig, apiKey string, timeoutServer int64) *App {
-	//db, err := postgres.Conn(params)
+func New(ctx context.Context, log *slog.Logger, paramsPostgres domain.PostgresParams, paramsRedis domain.RedisParams, gatewayCfg config.GatewayConfig, parserCfg config.ParserConfig, qdrantCfg config.QdrantConfig, apiKey string, timeoutServer, timeoutRefresh int64, hmacSecret string, costHasher int) *App {
+	db, err := postgres.Conn(paramsPostgres)
+	rdb, err := redis.Conn(ctx, paramsRedis)
 	qdrantConf := &qdrant.Config{Port: qdrantCfg.Port, Host: qdrantCfg.Host}
 	clientQdrant, err := qdrant.NewClient(qdrantConf)
+	if err != nil {
+		panic("Failed connection with Qdrant, error: " + err.Error())
+	}
 	ensureCollectionExists(ctx, clientQdrant, qdrantCfg.NameCollection)
 	qdr := storage.NewQdrant(qdrantCfg.NameCollection, clientQdrant, qdrantCfg.LimitPoints, qdrantCfg.ScoreThreshold)
-	if err != nil {
-		panic("Failed connection with Postgres, error: " + err.Error())
-	}
 
+	postgres := storage.NewPostgres(db)
+	rds := storage.NewRedis(rdb, timeoutRefresh)
 	if err := qdr.EnsureExactFilterIndexes(ctx); err != nil {
 		panic("Не удалось создать keyboard индексы")
 	}
@@ -49,11 +56,19 @@ func New(ctx context.Context, log *slog.Logger, params domain.PostgresParams, ga
 	if err != nil {
 		panic(err)
 	}
-	parserService := service.NewParser(log, httpClient, ollamaClient, parserCfg.BrowserPath, qdr, qdrantCfg.BatchSize, vocab, avgDL, parserCfg.CommandsPath)
-	searcherService := service.NewSearcher(log, qdr, ollamaClient, clientOpenAi, vocab)
-	serv := service.NewService(parserService, searcherService)
 
-	serverApp := restapp.New(log, serv, gatewayCfg.Host, gatewayCfg.Port, timeoutServer)
+	parserService := service.NewParser(log, httpClient, ollamaClient, parserCfg.BrowserPath, qdr, qdrantCfg.BatchSize, vocab, avgDL, parserCfg.CommandsPath)
+	searcherService := service.NewSearcher(log, qdr, postgres, ollamaClient, clientOpenAi, vocab)
+
+	hasher := *hash.New(costHasher)
+	dummyHash, err := hasher.Hash("basePhrase")
+	if err != nil {
+		panic("Хешер не работает, ошибка:" + err.Error())
+	}
+	authService := service.NewAuth(log, postgres, rds, hasher, hmacSecret, dummyHash)
+	serv := service.NewService(parserService, searcherService, authService)
+
+	serverApp := restapp.New(log, serv, gatewayCfg.Host, gatewayCfg.Port, timeoutServer, hmacSecret)
 	return &App{Server: serverApp}
 }
 
